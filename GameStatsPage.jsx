@@ -1,6 +1,6 @@
 const React = require('react');  
 const { useSelector } = require('react-redux'); 
-const { actions, selectors, util, fs, MainPage } = require('vortex-api');  
+const { actions, selectors, util, MainPage } = require('vortex-api');  
 const path = require('path');  
 const { exec, execFile } = require('child_process');
 const iniFileMap = {  
@@ -21,12 +21,7 @@ const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'S
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
 const probePath = path.join(util.getVortexPath('assets_unpacked'), 'dotnetprobe.exe');  
-// MDI icon paths (hardcoded to avoid ES module import issues)  
-const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';  
-const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z'; 
-// Minimum versions considered "current"  
-const MIN_VCPP_MINOR = 20;  // 14.20+ = VC++ 2019 or later  
-const MIN_DOTNET_MAJOR = 9; // .NET 9+  
+
   
 function getIniPaths(gameId) {  
   const subPaths = iniFileMap[gameId?.toLowerCase()];  
@@ -53,9 +48,13 @@ function ul(...items) {
 let winapi;  
 try { winapi = require('winapi-bindings'); } catch (e) { winapi = null; }  
   
- 
+// MDI icon paths (hardcoded to avoid ES module import issues)  
+const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';  
+const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';  
   
-
+// Minimum versions considered "current"  
+const MIN_VCPP_MINOR = 20;  // 14.20+ = VC++ 2019 or later  
+const MIN_DOTNET_MAJOR = 9; // .NET 9+  
   
 function getVcppVersion(arch) {  
   if (!winapi) return null;  
@@ -95,7 +94,7 @@ function StatusIcon({ isOk }) {
   
 function sysRow(label, version, isCurrent) {  
   return React.createElement('div', {  
-    style: { display: 'flex', alignItems: 'left', marginBottom: '4px', fontSize: '12px' }  
+    style: { display: 'flex', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }  
   },  
     React.createElement(StatusIcon, { isOk: isCurrent }),  
     React.createElement('span', null,  
@@ -239,8 +238,8 @@ function GameStatsPage({ api }) {
   const iniPaths = getIniPaths(activeGameId);
   
   const gameInfo = useSelector((state) => {  
-    const gameId = selectors.activeGameId(state);  
-    return state.persistent.gameMode.gameInfo?.[gameId] || {};  
+  const gameId = selectors.activeGameId(state);  
+  return state.persistent.gameMode.gameInfo?.[gameId] || {};  
   });  
   
   //for health checks
@@ -272,7 +271,7 @@ function GameStatsPage({ api }) {
   const spaceNoLinksStr = spaceNoLinks != null ? util.bytesToString(spaceNoLinks) : 'Calculating...';
 
   
-  const [runtimeInfo, setRuntimeInfo] = useState({ vcx64: null, vcx86: null, }); //dotnet: null });  
+  const [runtimeInfo, setRuntimeInfo] = useState({ vcx64: null, vcx86: null, dotnet: null });  
   
   useEffect(() => {  
     const vcx64 = getVcppVersion('x64');  
@@ -286,7 +285,6 @@ function GameStatsPage({ api }) {
     child.stdout?.on('data', (d) => stdout += d);  
     child.stderr?.on('data', (d) => stderr += d);  
   
-    /* removing dotnet check for now. it's unneeded
     child.on('close', (exitCode) => {  
       if (exitCode === 0) {  
         // Parse "Success: Found .NET 9.0.17" -> "9.0.17"  
@@ -301,12 +299,8 @@ function GameStatsPage({ api }) {
   });   
   
     child.on('error', () => resolve({ version: 'Not found', ok: false }));  
-  */   
-  
-    },
-  
-  []);
-  
+     
+  }, []);
 
 
   const allProfiles = useSelector((state) => state?.persistent?.profiles || {});  
@@ -326,6 +320,7 @@ function GameStatsPage({ api }) {
   
     const checkRemovable = async () => {  
       try {  
+        const winapi = require('winapi-bindings');  
         const volume = winapi.GetVolumePathName(gamePath);  
           
         const drivelist = require('drivelist').list;  
@@ -358,14 +353,14 @@ function GameStatsPage({ api }) {
       'info',  
       'Welcome to Immersive Support',  
       {  
-        htmlText: '<style>'
-          + '#game-stats-welcome { display: flex !important; align-items: center; }'  
-          + '#game-stats-welcome .modal-dialog { margin: auto !important; height: auto !important; }'  
-          + '#game-stats-welcome .dialog-container { min-height: 0 !important; }'  
-          + '#game-stats-welcome .dialog-content-html { flex: 0 0 auto !important; }' 
-          + '</style>'
-          + '<h4 style="margin-top:0">Important things to remember for I&amp;A:</h4>'
-		      + '<br><br>'
+        htmlText: '<style>'  
+		  + '#game-stats-welcome { display: flex !important; align-items: center; }'  
+		  + '#game-stats-welcome .modal-dialog { margin: auto !important; height: auto !important; }'
+		  + '#game-stats-welcome .dialog-container { min-height: 0 !important; }'  
+		  + '#game-stats-welcome .dialog-content-html { flex: 0 0 auto !important; }'  
+		  + '</style>'
+		  + '<h4 style="margin-top:0">Important things to remember for I&amp;A:</h4>'
+		  + '<br><br>'
           + '<ul style="margin:0;padding-left:20px;list-style-type:disc">'  
           + '<li>Profiles are not separate</li>'  
           + '<li>Mods or collections in other profiles will almost always prevent the collection from starting</li>'  
@@ -382,7 +377,7 @@ function GameStatsPage({ api }) {
           + '</ul></li>'  
           + '<li>The collection uses Pandora for animations — FNIS or Nemesis should not be installed or run</li>'  
           + '</ul>' 
-		      + '<br><br>'
+		  + '<br><br>'
           + '<h4 style="margin-bottom:0"><strong>Screenshot everything above the Troubleshooting section for the Discord Support Team</strong></h4>',
         checkboxes: [  
           {  
@@ -419,24 +414,11 @@ useEffect(() => {
   }  
   
   // --- INI files present ---  
-  console.log('Checking INI files for gameId:', activeGameId, 'paths:', iniPaths);
-  const checkIniFiles = async () => {  
-    const results = await Promise.all(  
-      iniPaths.map(p =>  
-        fs.statAsync(p)  
-          .then((stats) => stats.size > 0)  
-          .catch(() => false)  
-      )  
-    );
-  console.log('INI results:', results);  
-  const iniOk = iniPaths.length > 0 && results.every(r => r === true);  
-  console.log('iniOk: ', iniOk);
+  const iniOk = iniPaths.length > 0 && iniPaths.every((p) => {  
+    try { require('fs').statSync(p); return true; } catch { return false; }  
+  });  
   setHealthAsync((p) => ({ ...p, iniPresent: iniOk }));  
-};  
   
-  checkIniFiles();
- 
-/*
   // --- Shader cache present ---  
   const shaderCacheMap = {  
     skyrim:    path.join(process.env.LOCALAPPDATA, 'Skyrim', 'ShaderCache'),  
@@ -451,8 +433,8 @@ useEffect(() => {
     try { require('fs').statSync(scPath); scOk = true; } catch {}  
   }  
   setHealthAsync((p) => ({ ...p, shaderCachePresent: scOk }));  
-*/  
-}, [iniPaths, activeGameId]);
+  
+}, [activeGameId]);
 
 // Deployment  
 const isDeployed = !needToDeploy;  
@@ -671,9 +653,9 @@ const neverInstalledCount = regularMods.filter(m =>
 		  React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used (No Links): '),  
 		  React.createElement('span', null, spaceNoLinksStr)  
 	  ),  
-	  healthRow('VC++ x64', runtimeInfo.vcx64, isVcppCurrent(runtimeInfo.vcx64)),  
-	  healthRow('VC++ x86', runtimeInfo.vcx86, isVcppCurrent(runtimeInfo.vcx86)),  
-	  //sysRow('.NET Desktop', runtimeInfo.dotnet, isDotNetCurrent(runtimeInfo.dotnet)),  
+	  sysRow('VC++ x64', runtimeInfo.vcx64, isVcppCurrent(runtimeInfo.vcx64)),  
+	  sysRow('VC++ x86', runtimeInfo.vcx86, isVcppCurrent(runtimeInfo.vcx86)),  
+	  sysRow('.NET Desktop', runtimeInfo.dotnet, isDotNetCurrent(runtimeInfo.dotnet)),  
 	  ),
       ),
     
@@ -682,9 +664,9 @@ const neverInstalledCount = regularMods.filter(m =>
 	React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } }, 
 		// Column 1
         React.createElement('div', { style: { flex: '1' }},   
-        React.createElement('strong', null,),
-		    row('Enabled Mods: ', `${enabledModsCount}`),
-		    row('Disabled Mods: ', `${disabledCount}`),
+          React.createElement('strong', null,),
+		  row('Enabled Mods: ', `${enabledModsCount}`),
+		  row('Disabled Mods: ', `${disabledCount}`),
           React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },  
             ...Object.entries(collectionCounts).map(([name, count]) =>  
               React.createElement('li', { key: name }, `${name}: ${count}`)  
@@ -694,12 +676,13 @@ const neverInstalledCount = regularMods.filter(m =>
         ),  
 		
 		//Column 2
-	  React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
+	  React.createElement('div', { style: { flexShrink: 0, textAlign: 'right', minWidth: '220px' } },
         row('Total Active Plugins: ', activePlugins.length),  
-		    row('Disabled Plugins: ', disabledPlugins.length),
+		row('Disabled Plugins: ', disabledPlugins.length),
         row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),  
         row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),  
-    ),
+        
+	  ),
 	),
 		React.createElement('hr', null),
 		
@@ -747,16 +730,16 @@ const neverInstalledCount = regularMods.filter(m =>
     },  
 // Column 1  
       React.createElement('div', { style: { flex: '0 0 auto' } },  
-        healthRow('Mods Deployed', !needToDeploy),  
-        healthRow('Plugins Sorted', pluginsSorted, false),  
-        healthRow('Game Launched Once', gameLaunched, healthAsync.iniPresent === null),  
-        healthRow('OneDrive NOT in INI Path',!hasOneDrive, false),  
+        healthRow('Mods Deployed',  !needToDeploy),  
+        healthRow('Plugins Sorted',    pluginsSorted,                            false),  
+        healthRow('Game Launched Once',     gameLaunched,                        healthAsync.iniPresent === null),  
+        healthRow('OneDrive NOT in INI Path',!hasOneDrive,                        false),  
       ),  
       // Column 2  
       React.createElement('div', { style: { flex: '0 0 auto' } },  
-        healthRow('No Vortex Update Pending',!updatePending, healthAsync.updateAvailable === null),  
-        healthRow('SKSE64 is Primary Tool', isSKSEPrimary, false),  
-        healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),  
+        healthRow('No Vortex Update Pending',!updatePending,                     healthAsync.updateAvailable === null),  
+        healthRow('SKSE64 is Primary Tool', isSKSEPrimary,                        false),  
+        healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis,               false),  
       ),  
     )  
   ),
