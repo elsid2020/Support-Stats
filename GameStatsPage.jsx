@@ -20,7 +20,6 @@ const iniFileMap = {
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
-//// const probePath = path.join(util.getVortexPath('assets_unpacked'), 'dotnetprobe.exe');  
 // MDI icon paths (hardcoded to avoid ES module import issues)  
 const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
 const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';
@@ -80,10 +79,7 @@ function isVcppCurrent(version) {
   return major >= 14 && minor >= MIN_VCPP_MINOR;
 }
 
-function isDotNetCurrent(version) {
-  if (!version) return false;
-  return parseInt(version.split('.')[0], 10) >= MIN_DOTNET_MAJOR;
-}
+  
 
 function StatusIcon({ isOk }) {
   return React.createElement('svg', {
@@ -217,7 +213,16 @@ const faqItems = [
   },
 ];
 
-//==================Main Function================================================================================= 
+/*==================Main Function================================================================================= 
+*
+*
+*
+*                          MAIN COMPONENT
+*
+*
+*
+*
+===================================================================================================================*/
 function GameStatsPage({ api }) {
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
@@ -282,37 +287,8 @@ function GameStatsPage({ api }) {
   const toolList = Object.values(discoveredTools)
     .filter(tool => tool.path != null && tool.hidden !== true)
     .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
-    /*
-    .map(tool =>
-      React.createElement('div', {
-        key: tool.id,
-        style: {
-          fontSize: '0.85em',
-          marginTop: '2px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-        },
-        title: 'Click to copy path',
-        onClick: () => {
-          navigator.clipboard.writeText(tool.path);
-          api.sendNotification({
-            type: 'success',
-            message: `Copied: ${tool.name ?? tool.id}`,
-            displayMS: 2000,
-          });
-        },
-      },
-        `${tool.name ?? tool.id}: `,
-        React.createElement('span', { style: { opacity: 0.7, marginLeft: '4px' } }, tool.path)
-      )
-    );*/
 
-  //// const allMods = useSelector((state) =>  
-  ////  state.persistent?.mods?.[activeGameId] ?? {}  
-  //// );
-
-  const MAX_VISIBLE_TOOLS = 5;  
+    const MAX_VISIBLE_TOOLS = 5;  
   const [toolsExpanded, setToolsExpanded] = React.useState(false);  
   
   const visibleTools = toolsExpanded ? toolList : toolList.slice(0, MAX_VISIBLE_TOOLS);
@@ -332,23 +308,10 @@ function GameStatsPage({ api }) {
     const vcx86 = getVcppVersion('x86');
     setRuntimeInfo(prev => ({ ...prev, vcx64, vcx86 }));
 
-    //// const child = execFile(probePath, ['8']); // check for .NET 8+  
-
-    ////  let stdout = '';  
-    ////  let stderr = '';  
-    ////  child.stdout?.on('data', (d) => stdout += d);  
-    ////  child.stderr?.on('data', (d) => stderr += d);  
-  },
-
-    []);
-
-
-
-  //// const allProfiles = useSelector((state) => state?.persistent?.profiles || {});  
+   },[]);
 
   const pluginList = useSelector((state) => state?.session?.plugins?.pluginList || {});
   const pluginInfo = useSelector((state) => state?.session?.plugins?.pluginInfo || {});
-  //const loadOrder  = useSelector((state) => state?.loadOrder || {});  
 
 
 
@@ -373,7 +336,6 @@ function GameStatsPage({ api }) {
 
         setIsRemovable(disk?.isRemovable === true);
       } catch (err) {
-        console.error('Failed to check removable drive:', err);
         setIsRemovable(false);
       }
     };
@@ -490,9 +452,7 @@ function GameStatsPage({ api }) {
             .catch(() => false)
         )
       );
-      //// console.log('INI results:', results);
       const iniOk = iniPaths.length > 0 && results.every(r => r === true);
-      //// console.log('iniOk: ', iniOk);
       setHealthAsync((p) => ({ ...p, iniPresent: iniOk }));
     };
 
@@ -501,9 +461,6 @@ function GameStatsPage({ api }) {
 
   // Deployment  
   const isDeployed = !needToDeploy;
-
-  // Auto-sort (best available proxy for "plugins sorted")  
-  // const isSorted = autoSortEnabled; 
 
   const pluginsSorted = useSelector((state) =>
     state?.persistent?.immersiveSupport?.pluginsSorted === true
@@ -542,6 +499,31 @@ function GameStatsPage({ api }) {
   } else if (xseTool.hidden) {
     xseStatus = 'hidden';
   }
+
+// Check if the binary actually exists at the expected location  
+const xseExecutable = xseTool?.path?.replace(/^.*[\\/]/, '') ?? null;  
+const expectedXsePath = gamePath && xseExecutable ? path.join(gamePath, xseExecutable) : null;
+  
+// You need to do this check asynchronously  
+const [xseExistsAtExpected, setXseExistsAtExpected] = useState(false);  
+const [xseExistsAtStored, setXseExistsAtStored] = useState(false);  
+  
+useEffect(() => {  
+  if (!expectedXsePath) return;  
+  fs.statAsync(expectedXsePath)  
+    .then(() => setXseExistsAtExpected(true))  
+    .catch(() => setXseExistsAtExpected(false));  
+  
+  if (xseTool?.path) {  
+    fs.statAsync(xseTool.path)  
+      .then(() => setXseExistsAtStored(true))  
+      .catch(() => setXseExistsAtStored(false));  
+  }  
+}, [expectedXsePath, xseTool?.path]);  
+  
+const showRestoreButton =  
+  xseTool?.hidden === true ||  
+  (xseExistsAtExpected && !xseExistsAtStored); // binary moved, stored path is stale
 
   // FNIS or Nemesis installed and enabled  
   const hasFnisOrNemesis = Object.entries(mods).some(([modId, mod]) => {
@@ -584,7 +566,7 @@ function GameStatsPage({ api }) {
     .join('\n');
 
 
-  //Build a map of modId -> [collectionMod, ...]
+  // Build a map of modId -> [collectionMod, ...]
   const collectionMap = React.useMemo(() => {
     const map = {};
     Object.values(mods).filter(m => m.type === 'collection').forEach(coll => {
@@ -615,16 +597,6 @@ function GameStatsPage({ api }) {
   const disabledCount = regularMods.filter(m =>
     m.state === 'installed' && profile?.modState?.[m.id]?.enabled !== true
   ).length;
-
-  //The uninstalled and never installed counts aren't reliable and unnecessary
-
-  /*const uninstalledCount = regularMods.filter(m =>  
-    m.state === 'downloaded' && m.attributes?.wasInstalled === true  
-  ).length;  
-  const neverInstalledCount = regularMods.filter(m =>  
-    m.state === 'downloaded' && !m.attributes?.wasInstalled  
-  ).length;
-  */
 
   const collectionCounts = {};
   let noneCount = 0;
@@ -802,8 +774,29 @@ function GameStatsPage({ api }) {
       },  
       title: 'Click to restore this tool',  
       onClick: () => {  
-        api.store.dispatch(actions.setToolVisible(activeGameId, expectedXseId, true));  
-      }  
+  const store = api.store;  
+  
+  // Step 1: Un-hide the tool (sets hidden: false)  
+  store.dispatch(actions.setToolVisible(activeGameId, expectedXseId, true));  
+  
+  // Step 2: Clear the custom flag so re-discovery can update the path  
+  store.dispatch(actions.addDiscoveredTool(  
+    activeGameId,  
+    expectedXseId,  
+    { ...xseTool, custom: false, hidden: false },  
+    false  
+  ));  
+  
+  // Step 3: Trigger re-discovery to find the actual current path  
+  api.emitAndAwait('discover-tools', activeGameId)  
+    .then(() => {  
+      api.sendNotification({  
+        type: 'success',  
+        message: 'SKSE tool restored and path refreshed',  
+        displayMS: 3000,  
+      });  
+    });  
+}  
     }, '(hidden — click to restore!)')  
   : xseStatus  
     ? React.createElement('span', {  
@@ -812,49 +805,7 @@ function GameStatsPage({ api }) {
     : null
                     )
                     : null,
-/*   toolList.length === 0 
-      ? React.createElement('div', { style: { opacity: 0.6, fontSize: '0.85em' } }, 'None')  
-    : React.createElement('div', null,  
-        visibleTools.map(tool =>  
-          React.createElement('div', {  
-            key: tool.id,  
-            style: { fontSize: '0.85em', marginTop: '2px', cursor: 'pointer', paddingLeft: '20px' },  
-            title: 'Click to copy path',  
-            onClick: () => {  
-              navigator.clipboard.writeText(tool.path);  
-              api.sendNotification({  
-                type: 'success',  
-                message: `Copied path to ${tool.name ?? tool.id}`,  
-                displayMS: 2000,  
-              });  
-            },  
-          },  
-            `${tool.name ?? tool.id}: `,  
-            React.createElement('span', { style: { opacity: 0.7 } }, tool.path),  
-            !tool.custom  
-              ? React.createElement('span', {  
-                  style: { opacity: 0.5, fontSize: '0.8em', fontStyle: 'italic', marginLeft: '4px' }  
-                }, '(not configured)')  
-              : null  
-          )  
-        ),  
-        toolList.length > MAX_VISIBLE_TOOLS  
-          ? React.createElement('div', {  
-              style: {  
-                fontSize: '0.85em',  
-                marginTop: '4px',  
-                cursor: 'pointer',  
-                opacity: 0.7,  
-                textDecoration: 'underline',  
-              },  
-              onClick: () => setToolsExpanded(prev => !prev),  
-            },  
-              toolsExpanded  
-                ? 'Show less'  
-                : `Show ${toolList.length - MAX_VISIBLE_TOOLS} more...`  
-            )  
-          : null  
-  )  */ // Removed this for now to just focus on if skse is installed or not
+
 )
               ),
             ),
@@ -870,7 +821,6 @@ function GameStatsPage({ api }) {
               ),
               healthRow('VC++ x64', isVcppCurrent(runtimeInfo.vcx64), runtimeInfo.vcx64),
               healthRow('VC++ x86', isVcppCurrent(runtimeInfo.vcx86), runtimeInfo.vcx86),
-              //sysRow('.NET Desktop', runtimeInfo.dotnet, isDotNetCurrent(runtimeInfo.dotnet)),  
             ),
           ),
 
@@ -963,7 +913,6 @@ function GameStatsPage({ api }) {
                 suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
                 suppressedCount > 0
                   ? () => {
-                    console.log('Click fired, suppressedIds:', suppressedIds);
                     suppressedIds.forEach(id =>
                       api.suppressNotification?.(id, false));
                     api.events.emit('trigger-test-run', 'gamemode-activated');
