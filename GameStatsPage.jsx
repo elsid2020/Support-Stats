@@ -1,12 +1,14 @@
 const React = require('react');
 const { useSelector } = require('react-redux');
-const { actions, selectors, util, fs, MainPage } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
 const { shell } = require('electron'); 
 const { exec, execFile } = require('child_process');
 const { count } = require('console');
+const { json } = require('stream/consumers');
+const semver = require('semver')
 const iniFileMap = {
   skyrim: ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],
   skyrimse: ['Skyrim Special Edition/Skyrim.ini', 'Skyrim Special Edition/SkyrimPrefs.ini'],
@@ -261,17 +263,17 @@ const faqItems = [
 ];
 
 
-const userOS = "";
+
 
 function openScreenshotTool() {
   if ( process.platform === 'win32') {
-    userOS = "Windows";
+    
     shell.openExternal('ms-screenclip:');
     return;
   }
 
   if (process.platform === 'linux') {
-    userOS = "Linux";
+    
     // Try tools in order of preference  
     const tools = [
       'flameshot gui',           // cross-desktop, most popular  
@@ -314,25 +316,23 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.4.0";
+  const extensionVersion = "1.4.1";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
   const gameName = game ? game.name : 'Unknown';
-
+  const { useEffect, useState, useRef } = React;
   const iniPaths = getIniPaths(activeGameId);
-
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  
+  
   const gameInfo = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
     return state.persistent.gameMode.gameInfo?.[gameId] || {};
   });
   const profile = useSelector((state) => selectors.activeProfile(state));
 
-
-  const [refreshKey, setRefreshKey] = React.useState(0);
-
-
-  const { useEffect, useState, useRef } = React;
+  
   const gameDiscovery = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
     return state?.settings?.gameMode?.discovered?.[gameId] || {};
@@ -359,52 +359,92 @@ function GameStatsPage({ api }) {
   os: 'Loading...',  
 });
 
-  React.useEffect(() => {  
-  // OS  
-  getOSFlavor().then(flavor =>  
-    setHardwareInfo(prev => ({ ...prev, os: flavor }))  
-  );  
-  
-  // CPU — synchronous  
-  const cpus = os.cpus();  
-  if (cpus && cpus.length > 0) {  
-    setHardwareInfo(prev => ({ ...prev, cpu: cpus[0].model.trim() }));  
-  }  
-  
-  // RAM — synchronous  
-  const totalRam = os.totalmem();  
-  setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));  
-  
-  // GPU — async via PowerShell/exec  
-  exec(  
-    'powershell -command "Get-WmiObject Win32_VideoController | Select-Object -ExpandProperty Name"',  
-    (err, stdout) => {  
-      if (!err && stdout.trim()) {  
-        setHardwareInfo(prev => ({ ...prev, gpu: stdout.trim().split('\n')[0].trim() }));  
-      } else {  
-        setHardwareInfo(prev => ({ ...prev, gpu: 'Unknown' }));  
-      }  
-    }  
-  );  
-}, []);
+  React.useEffect(() => {
+    const { exec } = require('child_process');
+    // OS  
+    getOSFlavor().then(flavor =>
+      setHardwareInfo(prev => ({ ...prev, os: flavor }))
+    );
+
+    // CPU — synchronous  
+    const cpus = os.cpus();
+    if (cpus && cpus.length > 0) {
+      setHardwareInfo(prev => ({ ...prev, cpu: cpus[0].model.trim() }));
+    }
+
+    // RAM — synchronous  
+    const totalRam = os.totalmem();
+    setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));
+
+    // GPU
+    if (process.env.WINELOADER) {
+      // Try reading GPU from Linux sysfs  
+      exec('cat Z:\\sys\\class\\drm\\card0\\device\\product_name 2>nul || echo Unknown',
+        { timeout: 3000 },
+        (err, stdout) => {
+          setHardwareInfo(prev => ({
+            ...prev,
+            gpu: (!err && stdout.trim() && stdout.trim() !== 'Unknown')
+              ? stdout.trim()
+              : 'Unknown (Wine)'
+          }));
+        }
+      );
+    } else {
+      // GPU — async via PowerShell/exec  
+      exec(
+        'powershell -NoProfile -NonInteractive -Command "'
+        + '$gpu = (Get-WmiObject Win32_VideoController | Select-Object -First 1).Name; '
+        + '$regBase = \'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\'; '
+        + '$vram = 0; '
+        + 'Get-ChildItem $regBase -ErrorAction SilentlyContinue | ForEach-Object { '
+        + '  $desc = (Get-ItemProperty $_.PSPath -Name DriverDesc -ErrorAction SilentlyContinue).DriverDesc; '
+        + '  if ($desc -and $gpu -and ($desc -like (\'*\' + $gpu + \'*\') -or $gpu -like (\'*\' + $desc + \'*\'))) { '
+        + '    $v = (Get-ItemProperty $_.PSPath -Name \'HardwareInformation.qwMemorySize\' -ErrorAction SilentlyContinue).\'HardwareInformation.qwMemorySize\'; '
+        + '    if ($v) { $vram = $v } '
+        + '  } '
+        + '}; '
+        + 'Write-Output ($gpu + \' | \' + [math]::Round($vram / 1GB, 0) + \' GB\')"',
+        (err, stdout) => {
+          if (err || !stdout.trim()) {
+            setHardwareInfo(prev => ({ ...prev, gpu: 'Unknown' }));
+            return;
+          }
+          setHardwareInfo(prev => ({ ...prev, gpu: stdout.trim() }));
+        }
+      );
+    }
+  }, []);
 
   function getOSFlavor() {  
   return new Promise((resolve) => {  
-    if (process.platform === 'win32') {  
+    if (process.env.WINELOADER) {  
+      // Wine on Linux — check this BEFORE the win32 branch  
+      nodeFs.readFile('Z:\\etc\\os-release', 'utf8', (err, data) => {  
+        if (err) {  
+          nodeFs.readFile('Z:\\proc\\version', 'utf8', (err2, vdata) => {  
+            if (err2) return resolve('Linux (via Wine)');  
+            const match = vdata.match(/Linux version (\S+)/);  
+            resolve(match ? `Linux ${match[1]} (via Wine)` : 'Linux (via Wine)');  
+          });  
+          return;  
+        }  
+        const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);  
+        resolve(match ? `${match[1]} (via Wine)` : 'Linux (via Wine)');  
+      });  
+    } else if (process.platform === 'win32') {  
       exec(  
         'powershell -NoProfile -Command "(Get-WmiObject Win32_OperatingSystem).Caption"',  
         (err, stdout) => {  
           if (err || !stdout.trim()) {  
             resolve(`Windows (${require('os').release()})`);  
           } else {  
-            // stdout: "Microsoft Windows 11 Home"  
             resolve(stdout.trim().replace('Microsoft ', ''));  
           }  
         }  
       );  
     } else if (process.platform === 'linux') {  
-      // /etc/os-release has PRETTY_NAME="Ubuntu 22.04.3 LTS"  
-      require('fs').readFile('/etc/os-release', 'utf8', (err, data) => {  
+      nodeFs.readFile('/etc/os-release', 'utf8', (err, data) => {  
         if (err) return resolve(`Linux (${require('os').release()})`);  
         const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);  
         resolve(match ? match[1] : `Linux (${require('os').release()})`);  
@@ -600,23 +640,45 @@ useEffect(() => {
   }
 
 
-  const [healthAsync, setHealthAsync] = useState({
-    updateAvailable: null,   // null = checking  
-    iniPresent: null,
-    suppressedMap: null,
-
-  });
+const updateChannel = useSelector(state => state.settings?.update?.channel ?? 'stable');  
+  
+const [healthAsync, setHealthAsync] = useState({  
+  updateAvailable: null,   // null = checking  
+  updateVersion: null,  
+  iniPresent: null,  
+  suppressedMap: null,  
+});  
+  
+// Separate useEffect that check the github repo API. rate limit 60/IP per hour
+useEffect(() => {  
+  const currentVersion = util.getApplication().version;  
+  const channel = updateChannel;  
+  
+  util.github.releases()  
+    .then(releases => {  
+      // Filter based on channel: include prereleases only on beta channel  
+      const candidates = releases.filter(rel =>  
+        channel !== 'stable' ? true : !rel.prerelease  
+      );  
+  
+      // Find the newest release that is newer than the current version  
+      const latest = candidates  
+        .filter(rel => semver.valid(rel.name) && semver.gt(rel.name, currentVersion))  
+        .sort((a, b) => semver.compare(b.name, a.name))[0];  
+  
+      setHealthAsync(p => ({  
+        ...p,  
+        updateAvailable: latest !== undefined,  
+        updateVersion: latest?.name ?? null,  
+      }));  
+    })  
+    .catch(() => {  
+      setHealthAsync(p => ({ ...p, updateAvailable: false, updateVersion: null }));  
+    });  
+}, []);
+  
 
   useEffect(() => {
-    // --- Vortex update check ---  
-    if (window.api?.updater?.getStatus) {
-      window.api.updater.getStatus()
-        .then((status) => setHealthAsync((p) => ({ ...p, updateAvailable: status.available })))
-        .catch(() => setHealthAsync((p) => ({ ...p, updateAvailable: false })));
-    } else {
-      setHealthAsync((p) => ({ ...p, updateAvailable: false }));
-    }
-
     // --- INI files present ---  
     const checkIniFiles = async () => {
       const results = await Promise.all(
@@ -692,7 +754,7 @@ useEffect(() => {
   const dataPath = path.join(gamePath, 'Data');
 
   useEffect(() => {
-    console.log('====scan triggered, gamePath:', gamePath, 'activeGameId:', activeGameId);
+    //// console.log('====scan triggered, gamePath:', gamePath, 'activeGameId:', activeGameId);
     if (!gamePath || gamePath === 'Not discovered') return;
     setRawUnmanaged(prev => ({ ...prev, loading: true }));
     function walkUnmanaged(dirPath, maxDepth) {
@@ -1273,26 +1335,28 @@ useEffect(() => {
             // Column 1  
             React.createElement('div', { style: { flex: '0 0 auto' } },
               healthRow('Mods Deployed', !needToDeploy, null,
-                () => api.events.emit("show-main-page", "Mods")
-              ),
+                () => api.events.emit("show-main-page", "Mods")),
               healthRow('Plugins Sorted', pluginsSorted, null,
-                () => api.events.emit("show-main-page", "gamebryo-plugins")
-              ),
+                () => api.events.emit("show-main-page", "gamebryo-plugins")),
               healthRow('INI Files Present', gameLaunched, healthAsync.iniPresent === null),
               healthRow('OneDrive NOT in INI Path', !hasOneDrive, false),
               healthRow('Not a removable drive', !isRemovable, null),
             ),
             // Column 2  
             React.createElement('div', { style: { flex: '0 0 auto' } },
-              healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null),
+              healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
+                healthAsync.updateAvailable === null
+                ? 'Checking...'
+                : healthAsync.updateAvailable && healthAsync.updateVersion 
+                  ? `${healthAsync.updateVersion} Pending`
+                  : 'Vortex is up to date'),
               healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
               healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),
               healthRow('No Unmanaged Files', !hasUnmanagedFiles,
                 unmanagedFiles.loading
                   ? 'Scanning...'
                   : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
-                hasUnmanagedFiles ? showUnmanagedDialog : null
-              ),
+                hasUnmanagedFiles ? showUnmanagedDialog : null),
               healthRow('Suppressed Notifications',
                 suppressedCount === 0,
                 suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
@@ -1303,8 +1367,7 @@ useEffect(() => {
                     api.events.emit('trigger-test-run', 'gamemode-activated');
                   }
                   : null,
-                suppressedCount > 0 ? tooltipText : null
-              )
+                suppressedCount > 0 ? tooltipText : null)
             ),
           )
         ),
