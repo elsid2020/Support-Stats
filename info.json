@@ -1,0 +1,7 @@
+{  
+  "name": "game-vitals-extension",
+  "author": "Elsid2010",
+  "description": "Provides a summary of the game and mods configuration to facilitate the Immersive Collecion's support efforts"
+  "version": "1.0.0",  
+  "main": "index.js"  
+}
