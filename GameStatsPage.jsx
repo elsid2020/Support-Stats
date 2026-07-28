@@ -1,9 +1,12 @@
 const React = require('react');
 const { useSelector } = require('react-redux');
 const { actions, selectors, util, fs, MainPage } = require('vortex-api');
+const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
+const { shell } = require('electron'); 
 const { exec, execFile } = require('child_process');
+const { count } = require('console');
 const iniFileMap = {
   skyrim: ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],
   skyrimse: ['Skyrim Special Edition/Skyrim.ini', 'Skyrim Special Edition/SkyrimPrefs.ini'],
@@ -31,13 +34,44 @@ const filesToSkip = new Set([
   'user.json',
 ]);
 
+const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
+const FLAG_LIGHT = 0x00000200; 
 
+function readPluginLightFlag(filePath) {
+  
+  return new Promise((resolve) => {
+    const buf = Buffer.alloc(12);
+    const fd = require('fs').open(filePath, 'r', (err, fd) => {
+      if (err) return resolve(false);
+      require('fs').read(fd, buf, 0, 12, 0, (err2, bytesRead) => {
+        require('fs').close(fd, () => { });
+        if (err2 || bytesRead < 12) return resolve(false);
+        // Verify TES4 magic: bytes 0-3 must be "TES4"  
+        if (buf.toString('ascii', 0, 4) !== 'TES4') return resolve(false);
+        const flags = buf.readUInt32LE(8);
+        resolve((flags & 0x200) !== 0); // FLAG_LIGHT  
+      });
+    });
+  });
+}
 
 // MDI icon paths (hardcoded to avoid ES module import issues)  
 const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
 const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';
 const discordIconPath = "M19.4308 5.26368C18.1561 4.67878 16.7892 4.24785 15.3599 4.00104C15.3339 3.99627 15.3079 4.00818 15.2945 4.03198C15.1187 4.34466 14.9239 4.75258 14.7876 5.0732C13.2503 4.84306 11.721 4.84306 10.2153 5.0732C10.0789 4.74545 9.87707 4.34466 9.70048 4.03198C9.68707 4.00897 9.66107 3.99707 9.63504 4.00104C8.20659 4.24706 6.83963 4.67799 5.56411 5.26368C5.55307 5.26844 5.54361 5.27638 5.53732 5.28669C2.94449 9.16032 2.23421 12.9387 2.58265 16.6703C2.58423 16.6886 2.59447 16.706 2.60867 16.7171C4.31934 17.9734 5.97642 18.7361 7.60273 19.2416C7.62876 19.2496 7.65634 19.24 7.6729 19.2186C8.05761 18.6933 8.40054 18.1393 8.69456 17.5568C8.71192 17.5227 8.69535 17.4822 8.65989 17.4687C8.11594 17.2624 7.598 17.0108 7.09977 16.7251C7.06037 16.7021 7.05721 16.6457 7.09347 16.6187C7.19831 16.5402 7.30318 16.4584 7.4033 16.3759C7.42141 16.3608 7.44665 16.3576 7.46794 16.3671C10.7411 17.8615 14.2846 17.8615 17.5191 16.3671C17.5404 16.3568 17.5657 16.36 17.5846 16.3751C17.6847 16.4576 17.7895 16.5402 17.8952 16.6187C17.9314 16.6457 17.9291 16.7021 17.8897 16.7251C17.3914 17.0163 16.8735 17.2624 16.3288 17.4679C16.2933 17.4814 16.2775 17.5227 16.2949 17.5568C16.5952 18.1385 16.9381 18.6924 17.3157 19.2178C17.3315 19.24 17.3599 19.2496 17.3859 19.2416C19.0201 18.7361 20.6772 17.9734 22.3879 16.7171C22.4028 16.706 22.4123 16.6894 22.4139 16.6711C22.8309 12.357 21.7154 8.60956 19.4568 5.28748C19.4513 5.27638 19.4419 5.26844 19.4308 5.26368ZM9.18335 14.3982C8.19792 14.3982 7.38594 13.4935 7.38594 12.3824C7.38594 11.2713 8.18217 10.3666 9.18335 10.3666C10.1924 10.3666 10.9965 11.2793 10.9807 12.3824C10.9807 13.4935 10.1845 14.3982 9.18335 14.3982ZM15.829 14.3982C14.8435 14.3982 14.0316 13.4935 14.0316 12.3824C14.0316 11.2713 14.8278 10.3666 15.829 10.3666C16.838 10.3666 17.6421 11.2793 17.6264 12.3824C17.6264 13.4935 16.838 14.3982 15.829 14.3982Z";
 
+
+function getDriveInfo(drivePath) {  
+  try {  
+    const root = require('path').parse(drivePath).root || drivePath;  
+    const stats = nodeFs.statfsSync(root);  
+    const freeGB = (stats.bavail * stats.bsize) / (1024 ** 3);  
+    const totalGB = (stats.blocks * stats.bsize) / (1024 ** 3);  
+    return { root, freeGB, totalGB };  
+  } catch {  
+    return null;  
+  }  
+}
 
 // Minimum versions considered "current"  
 const MIN_VCPP_MINOR = 20;  // 14.20+ = VC++ 2019 or later  
@@ -226,6 +260,49 @@ const faqItems = [
   },
 ];
 
+
+const userOS = "";
+
+function openScreenshotTool() {
+  if ( process.platform === 'win32') {
+    userOS = "Windows";
+    shell.openExternal('ms-screenclip:');
+    return;
+  }
+
+  if (process.platform === 'linux') {
+    userOS = "Linux";
+    // Try tools in order of preference  
+    const tools = [
+      'flameshot gui',           // cross-desktop, most popular  
+      'gnome-screenshot -i',     // GNOME  
+      'spectacle -r',            // KDE  
+      'xfce4-screenshooter -r',  // XFCE  
+      'scrot -s',                // minimal fallback (CLI, no GUI)  
+    ];
+
+    function tryNext(index) {
+      if (index >= tools.length) return;
+      const [cmd, ...args] = tools[index].split(' ');
+      exec(`which ${cmd}`, (err) => {
+        if (!err) {
+          exec(tools[index]);
+        } else {
+          tryNext(index + 1);
+        }
+      });
+    }
+
+    tryNext(0);
+    return;
+  }
+
+  // macOS  
+  if (process.platform === 'darwin') {
+    exec('screencapture -i -c'); // interactive, copies to clipboard  
+  }
+}
+
 /*==================Main Function================================================================================= 
 *
 *
@@ -237,7 +314,7 @@ const faqItems = [
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.3.1";
+  const extensionVersion = "1.4.0";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -275,45 +352,68 @@ function GameStatsPage({ api }) {
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
 
-  const [cpuInfo, setCpuInfo] = React.useState('Loading...');
-  const [ramInfo, setRamInfo] = React.useState('Loading...');
-  const [gpuInfo, setGpuInfo] = React.useState('Loading...');
+  const [hardwareInfo, setHardwareInfo] = React.useState({  
+  cpu: 'Loading...',  
+  ram: 'Loading...',  
+  gpu: 'Loading...',  
+  os: 'Loading...',  
+});
 
+  React.useEffect(() => {  
+  // OS  
+  getOSFlavor().then(flavor =>  
+    setHardwareInfo(prev => ({ ...prev, os: flavor }))  
+  );  
+  
+  // CPU — synchronous  
+  const cpus = os.cpus();  
+  if (cpus && cpus.length > 0) {  
+    setHardwareInfo(prev => ({ ...prev, cpu: cpus[0].model.trim() }));  
+  }  
+  
+  // RAM — synchronous  
+  const totalRam = os.totalmem();  
+  setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));  
+  
+  // GPU — async via PowerShell/exec  
+  exec(  
+    'powershell -command "Get-WmiObject Win32_VideoController | Select-Object -ExpandProperty Name"',  
+    (err, stdout) => {  
+      if (!err && stdout.trim()) {  
+        setHardwareInfo(prev => ({ ...prev, gpu: stdout.trim().split('\n')[0].trim() }));  
+      } else {  
+        setHardwareInfo(prev => ({ ...prev, gpu: 'Unknown' }));  
+      }  
+    }  
+  );  
+}, []);
 
-  React.useEffect(() => {
-    // CPU — os.cpus() is synchronous  
-    const cpus = os.cpus();
-    if (cpus && cpus.length > 0) {
-      setCpuInfo(cpus[0].model.trim());
-    }
-
-    // RAM — os.totalmem() is synchronous, returns bytes  
-    const totalRamGB = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(1);
-    setRamInfo(totalRamGB + ' GB');
-
-    // GPU — requires PowerShell  
-    exec(
-      'powershell -NoProfile -NonInteractive -Command "'
-      + '$gpu = (Get-WmiObject Win32_VideoController | Select-Object -First 1).Name; '
-      + '$regBase = \'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\'; '
-      + '$vram = 0; '
-      + 'Get-ChildItem $regBase -ErrorAction SilentlyContinue | ForEach-Object { '
-      + '  $desc = (Get-ItemProperty $_.PSPath -Name DriverDesc -ErrorAction SilentlyContinue).DriverDesc; '
-      + '  if ($desc -and $gpu -and ($desc -like (\'*\' + $gpu + \'*\') -or $gpu -like (\'*\' + $desc + \'*\'))) { '
-      + '    $v = (Get-ItemProperty $_.PSPath -Name \'HardwareInformation.qwMemorySize\' -ErrorAction SilentlyContinue).\'HardwareInformation.qwMemorySize\'; '
-      + '    if ($v) { $vram = $v } '
-      + '  } '
-      + '}; '
-      + 'Write-Output ($gpu + \' | \' + [math]::Round($vram / 1GB, 0) + \' GB\')"',
-      (err, stdout) => {
-        if (err || !stdout.trim()) {
-          setGpuInfo('Unknown');
-          return;
-        }
-        setGpuInfo(stdout.trim());
-      }
-    );
-  }, []);
+  function getOSFlavor() {  
+  return new Promise((resolve) => {  
+    if (process.platform === 'win32') {  
+      exec(  
+        'powershell -NoProfile -Command "(Get-WmiObject Win32_OperatingSystem).Caption"',  
+        (err, stdout) => {  
+          if (err || !stdout.trim()) {  
+            resolve(`Windows (${require('os').release()})`);  
+          } else {  
+            // stdout: "Microsoft Windows 11 Home"  
+            resolve(stdout.trim().replace('Microsoft ', ''));  
+          }  
+        }  
+      );  
+    } else if (process.platform === 'linux') {  
+      // /etc/os-release has PRETTY_NAME="Ubuntu 22.04.3 LTS"  
+      require('fs').readFile('/etc/os-release', 'utf8', (err, data) => {  
+        if (err) return resolve(`Linux (${require('os').release()})`);  
+        const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);  
+        resolve(match ? match[1] : `Linux (${require('os').release()})`);  
+      });  
+    } else {  
+      resolve(`${require('os').type()} ${require('os').release()}`);  
+    }  
+  });  
+}
 
   //for health checks
   const suppressedNotifications = useSelector((state) =>
@@ -351,6 +451,21 @@ function GameStatsPage({ api }) {
 
   const spaceUsed = gameInfo?.size?.value;
   const spaceNoLinks = gameInfo?.size_nolinks?.value;
+ 
+  const [driveInfo, setDriveInfo] = useState({ game: null, system: null });  
+  
+useEffect(() => {  
+  if (!gamePath || gamePath === 'Not discovered') return;  
+  
+  const systemRoot = process.platform === 'win32'  
+    ? (process.env.SystemDrive || 'C:') + '\\'  
+    : '/';  
+  
+  setDriveInfo({  
+    game: getDriveInfo(gamePath),  
+    system: getDriveInfo(systemRoot),  
+  });  
+}, [gamePath]);
 
   // Format with Vortex's built-in formatter  
   const spaceUsedStr = spaceUsed != null ? util.bytesToString(spaceUsed) : 'Calculating...';
@@ -423,13 +538,15 @@ function GameStatsPage({ api }) {
   });
 
   const hasShownWelcome = useRef(false);
+  const welcomeSeen = useSelector(state => state?.settings?.immersiveSupport?.welcomeSeen ?? false);  
+  const dispatch = require('react-redux').useDispatch();  
 
   useEffect(() => {
-    if (!isSuppressed && isImmersiveCollectionEnabled && !hasShownWelcome.current) {
+    if (!welcomeSeen && isImmersiveCollectionEnabled && !hasShownWelcome.current) {
       hasShownWelcome.current = true;  // set before showing to prevent double-fire  
       showWelcomeDialog();
     }
-  }, [isSuppressed, isImmersiveCollectionEnabled, api]);
+  }, [isSuppressed, isImmersiveCollectionEnabled, api, welcomeSeen]);
 
   const showWelcomeDialog = () => {
     api.showDialog(
@@ -476,7 +593,8 @@ function GameStatsPage({ api }) {
       'game-stats-welcome'
     ).then((result) => {
       if (result.input['dont_show_again']) {
-        api.store.dispatch(actions.suppressNotification('game-stats-welcome', true));
+        const dismissWelcome = () => dispatch({ type: 'IMMERSIVE_SET_WELCOME_SEEN', payload: true });  
+        
       }
     });
   }
@@ -571,6 +689,7 @@ function GameStatsPage({ api }) {
     plugins: rawUnmanaged.plugins.filter(f => !pluginList[f.name.toLowerCase()]?.isNative),
   }), [rawUnmanaged, pluginList]);
 
+  const dataPath = path.join(gamePath, 'Data');
 
   useEffect(() => {
     console.log('====scan triggered, gamePath:', gamePath, 'activeGameId:', activeGameId);
@@ -597,11 +716,15 @@ function GameStatsPage({ api }) {
         .catch(() => []);
     }
 
-    const dataPath = path.join(gamePath, 'Data');
+    
 
-    const scanPlugins = walkUnmanaged(dataPath, 1).then(files =>
-      files.filter(f => ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))
-    );
+    
+
+    const scanPlugins = walkUnmanaged(dataPath, 1)
+      .then(files => files.filter(f => 
+        ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))
+      );
+      
 
     const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>
       files.filter(f => path.extname(f.name).toLowerCase() === '.dll')
@@ -641,6 +764,8 @@ function GameStatsPage({ api }) {
       .catch(() => {
         setRawUnmanaged(prev => ({ ...prev, loading: false }));
       });
+
+    
   }, [gamePath, activeGameId, refreshKey]);
 
 
@@ -747,20 +872,52 @@ function GameStatsPage({ api }) {
   // A plugin is disabled if it exists on disk, is not native, and is not active  
   const disabledPlugins = React.useMemo(() => Object.keys(pluginList).filter(
     (id) => !pluginList[id]?.isNative && !isActive(id)
-  ), [pluginList]);
+  ), [pluginList, loadOrder]);
 
   const isValid = (id) =>
     (pluginList[id]?.deployed === true || pluginList[id]?.isNative === true) && isActive(id);
 
-  const isLight = (id) => {
+ /*onst isLight = (id) => {
     if (pluginInfo[id]?.isLight) return true;
     const filePath = pluginList[id]?.filePath || '';
     return filePath.toLowerCase().endsWith('.esl');
   };
+*/
 
-  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList]);
-  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins]);
-  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins]);
+
+const [pluginHeaders, setPluginHeaders] = React.useState({});  
+
+const isLight = (id) => {  
+  if (pluginInfo[id]?.isLight) {
+    console.log('isLight from pluginInfo!')
+    return true};  
+  const filePath = pluginList[id]?.filePath || '';  
+  if (filePath.toLowerCase().endsWith('.esl')) return true;  
+  return pluginHeaders[id] === true;  
+};
+
+useEffect(() => {  
+  if (!gamePath || gamePath === 'Not discovered') return;  
+  const dataPath = path.join(gamePath, 'Data');  
+  const ids = Object.keys(pluginList).filter(id =>  
+    pluginList[id]?.deployed || pluginList[id]?.isNative  
+  );  
+  Promise.all(  
+    ids.map(id => {  
+      const filePath = pluginList[id]?.filePath || path.join(dataPath, id);  
+      return readPluginLightFlag(filePath)  
+        .then(isLight => [id, isLight])  
+        .catch(() => [id, false]);  
+    })  
+  ).then(results => {  
+    setPluginHeaders(Object.fromEntries(results));  
+  });  
+}, [gamePath, activeGameId]);
+
+
+  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder]);
+  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders]);
+  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders]);
 
   const regularLimit = eslGame ? 254 : 255;
   const lightLimit = 4096;
@@ -782,9 +939,12 @@ function GameStatsPage({ api }) {
   const profileModCounts = useSelector((state) => {
     const counts = {};
     gameProfiles.forEach((profile) => {
-      counts[profile.id] = selectors.enabledModCountForProfile(state, profile.id);
-    });
-    return counts;
+      const mods = state.persistent.mods[profile.gameId] || {};  
+    counts[profile.id] = Object.keys(profile.modState || {})  
+      .filter(id => profile.modState[id]?.enabled && mods[id]?.state === 'installed')  
+      .length;  
+  }); 
+  return counts;
   }, shallowEqual);
 
   const gameProfileCount = gameProfiles.length;
@@ -855,6 +1015,10 @@ function GameStatsPage({ api }) {
 
       //Right button group
       React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        React.createElement('button', {  
+  onClick: openScreenshotTool,  
+  className: 'btn btn-default btn-s',  
+}, 'Take Screenshot'),
         React.createElement('button', {
           className: 'btn btn-default',
           style: { display: 'flex', alignItems: 'center' },
@@ -896,24 +1060,28 @@ function GameStatsPage({ api }) {
               position: 'absolute',
               top: '12px',
               right: '12px',
-              textAlign: 'right',
+              textAlign: 'left',
               fontSize: '12px',
               opacity: 0.75,
               lineHeight: '1.6',
             }
           },
             React.createElement('div', null,
+              React.createElement('strong', null, 'OS: '),
+               hardwareInfo.os,
+            ),
+            React.createElement('div', null,
               React.createElement('strong', null, 'CPU: '),
-              cpuInfo
+              hardwareInfo.cpu
             ),
             React.createElement('div', null,
               React.createElement('strong', null, 'RAM: '),
-              ramInfo
+              hardwareInfo.ram
             ),
             React.createElement('div', null,
               React.createElement('strong', null, 'GPU: '),
-              gpuInfo
-            )
+              hardwareInfo.gpu
+            ),
           ),
           React.createElement('hr', null),
 
@@ -996,6 +1164,14 @@ function GameStatsPage({ api }) {
             // Column 2  
             React.createElement('div', { style: { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '8px' } },
               React.createElement('div', null,
+                row('Game Drive Free - ', driveInfo.game
+                  ? `${driveInfo.game.root} — ${driveInfo.game.freeGB.toFixed(1)} GB free of ${driveInfo.game.totalGB.toFixed(1)} GB`
+                  : 'Unknown'
+                ),
+                row('System Drive Free - ', driveInfo.system
+                  ? `${driveInfo.system.root} — ${driveInfo.system.freeGB.toFixed(1)} GB free of ${driveInfo.system.totalGB.toFixed(1)} GB`
+                  : 'Unknown'
+                ),
                 React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used: '),
                 React.createElement('span', null, spaceUsedStr)
               ),
@@ -1054,10 +1230,12 @@ function GameStatsPage({ api }) {
             //column 1
             React.createElement('div', { style: { flex: '1' } },
               row('Active Profile: ', profileName),
+            React.createElement('ul', { style: { margin: '2px 0' } },
+              row('Active Mods per Profile: '),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
                 ...gameProfiles.map((p) =>
                   React.createElement('li', { key: p.id }, `${p.name} (${profileModCounts[p.id] || 0})`)
-                )
+                ))
               ),
             ),
 
@@ -1102,6 +1280,7 @@ function GameStatsPage({ api }) {
               ),
               healthRow('INI Files Present', gameLaunched, healthAsync.iniPresent === null),
               healthRow('OneDrive NOT in INI Path', !hasOneDrive, false),
+              healthRow('Not a removable drive', !isRemovable, null),
             ),
             // Column 2  
             React.createElement('div', { style: { flex: '0 0 auto' } },
