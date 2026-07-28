@@ -316,7 +316,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.4.1";
+  const extensionVersion = "1.5.0 - WiP";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -348,6 +348,87 @@ function GameStatsPage({ api }) {
     return selectors.installPathForGame(state, gameId);
   });
 
+const [healthAsync, setHealthAsync] = useState({  
+  updateAvailable: null,  
+  updateVersion: null,  
+  iniPresent: null,  
+  suppressedMap: null,  
+  aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data  
+});  
+
+const pluginList = useSelector(state =>  
+  (state.session?.plugins?.pluginList) ?? {}  
+);  
+  
+const nativeCount = Object.values(pluginList).filter(p => p.isNative).length;  
+  
+// true = full AE, false = not installed, 'partial' = some files missing  
+const aeDLCInstalled =  
+  nativeCount === 80 ? true :  
+  nativeCount === 10 ? false :  
+  nativeCount > 10   ? 'partial' :  
+  null; // pluginList not loaded yet
+
+  useEffect(() => {  
+  async function checkAEOwnership() {  
+    try {  
+      const steamPath = getSteamPath(); // your existing helper  
+      if (!steamPath) {  
+        setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));  
+        return;  
+      }  
+  
+      // Check all userdata/<SteamID> directories  
+      const userDataPath = path.join(steamPath, 'userdata');  
+      let owned = false;  
+  
+      try {  
+        const userIds = await fs.readdirAsync(userDataPath);  
+        for (const userId of userIds) {  
+          const localConfigPath = path.join(  
+            userDataPath, userId, 'config', 'localconfig.vdf'  
+          );  
+          try {  
+            // Change 4: search whole file, not just AppTickets section  
+            const data = await fs.readFileAsync(localConfigPath, 'utf8');  
+            if (data.includes('"1746860"')) {  
+              owned = true;  
+              break;  
+            }  
+          } catch {  
+            // this userdata entry has no localconfig.vdf, skip  
+          }  
+        }  
+      } catch {  
+        // userdata dir unreadable  
+      }  
+  
+      if (!owned) {  
+        // Fallback: appinfo_log.previous.txt (whole-file search, already was)  
+        try {  
+          const logPath = path.join(steamPath, 'logs', 'appinfo_log.previous.txt');  
+          const logData = await fs.readFileAsync(logPath, 'utf8');  
+          if (logData.includes('1746860=')) {  
+            owned = true;  
+          }  
+        } catch {  
+          // log file not found  
+        }  
+      }  
+  
+      // Change 3: no 'not_owned' — only true or 'unknown'  
+      setHealthAsync(p => ({  
+        ...p,  
+        aeDLCOwned: owned ? true : 'unknown',  
+      }));  
+    } catch {  
+      setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));  
+    }  
+  }  
+  
+  checkAEOwnership();  
+}, []);
+
   const totalModsInstalled = Object.values(mods).filter(
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
@@ -377,9 +458,9 @@ function GameStatsPage({ api }) {
     setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));
 
     // GPU
-    if (process.env.WINELOADER) {
+    if (process.env.WINEPREFIX) {
       // Try reading GPU from Linux sysfs  
-      exec('cat Z:\\sys\\class\\drm\\card0\\device\\product_name 2>nul || echo Unknown',
+      exec('vulkaninfo --summary |grep deviceName || echo Unknown',
         { timeout: 3000 },
         (err, stdout) => {
           setHardwareInfo(prev => ({
@@ -418,9 +499,9 @@ function GameStatsPage({ api }) {
 
   function getOSFlavor() {  
   return new Promise((resolve) => {  
-    if (process.env.WINELOADER) {  
+    if (process.env.WINEPREFIX || process.env.WINELOADER) {  
       // Wine on Linux — check this BEFORE the win32 branch  
-      nodeFs.readFile('Z:\\etc\\os-release', 'utf8', (err, data) => {  
+      nodeFs.readFile('Z:\\run\\host\\etc\\os-release', 'utf8', (err, data) => {  
         if (err) {  
           nodeFs.readFile('Z:\\proc\\version', 'utf8', (err2, vdata) => {  
             if (err2) return resolve('Linux (via Wine)');  
@@ -521,7 +602,7 @@ useEffect(() => {
 
   }, []);
 
-  const pluginList = useSelector((state) => state?.session?.plugins?.pluginList || {});
+  // const pluginList = useSelector((state) => state?.session?.plugins?.pluginList || {});
   const pluginInfo = useSelector((state) => state?.session?.plugins?.pluginInfo || {});
 
 
@@ -642,13 +723,6 @@ useEffect(() => {
 
 const updateChannel = useSelector(state => state.settings?.update?.channel ?? 'stable');  
   
-const [healthAsync, setHealthAsync] = useState({  
-  updateAvailable: null,   // null = checking  
-  updateVersion: null,  
-  iniPresent: null,  
-  suppressedMap: null,  
-});  
-  
 // Separate useEffect that check the github repo API. rate limit 60/IP per hour
 useEffect(() => {  
   const currentVersion = util.getApplication().version;  
@@ -744,6 +818,22 @@ useEffect(() => {
   const [xseExistsAtExpected, setXseExistsAtExpected] = useState(false);
   const [xseExistsAtStored, setXseExistsAtStored] = useState(false);
 
+  //// attempt at checking xse
+  useEffect(() => {  
+  if (!expectedXsePath) return;  
+  fs.statAsync(expectedXsePath)  
+    .then(() => setXseExistsAtExpected(true))  
+    .catch(() => setXseExistsAtExpected(false));  
+  
+  if (xseTool?.path) {  
+    fs.statAsync(xseTool.path)  
+      .then(() => setXseExistsAtStored(true))  
+      .catch(() => setXseExistsAtStored(false));  
+  } else {  
+    setXseExistsAtStored(false); // ← reset when path is gone  
+  }  
+}, [expectedXsePath, xseTool?.path, refreshKey]);
+
 
   const [rawUnmanaged, setRawUnmanaged] = useState({ plugins: [], animations: [], meshes: [], textures: [], dlls: [], loading: true });
   const unmanagedFiles = React.useMemo(() => ({
@@ -777,10 +867,6 @@ useEffect(() => {
         .then(results => [].concat(...results))
         .catch(() => []);
     }
-
-    
-
-    
 
     const scanPlugins = walkUnmanaged(dataPath, 1)
       .then(files => files.filter(f => 
@@ -1151,7 +1237,7 @@ useEffect(() => {
 
             // Column 1: Path/folder data  
             React.createElement('div', { style: { flex: '1' } },
-              row('Active Game: ', gameName),
+              row('Active Game: ', healthAsync.aeDLCOwned ? `${gameName} (with AE DLC)` : gameName),
               row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
@@ -1166,15 +1252,15 @@ useEffect(() => {
                   expectedXseId !== undefined
                     ? React.createElement('div', { style: { marginBottom: '4px' } },
                       React.createElement('strong', null, 'SKSE: '),
-                      xseTool && xseTool.path
+                      xseExistsAtExpected
                         ? React.createElement('span', {
                           style: { cursor: 'pointer', opacity: 0.8 },
                           title: 'Click to copy path',
                           onClick: () => {
-                            navigator.clipboard.writeText(xseTool.path);
+                            navigator.clipboard.writeText(expectedXsePath);
                             api.sendNotification({ type: 'success', message: 'SKSE path copied', displayMS: 2000 });
                           }
-                        }, xseTool.path)
+                        }, expectedXsePath)
                         : React.createElement('span', { style: { opacity: 0.6 } }, 'Not found'),
                       xseStatus === 'hidden'
                         ? React.createElement('span', {
@@ -1340,6 +1426,9 @@ useEffect(() => {
                 () => api.events.emit("show-main-page", "gamebryo-plugins")),
               healthRow('INI Files Present', gameLaunched, healthAsync.iniPresent === null),
               healthRow('OneDrive NOT in INI Path', !hasOneDrive, false),
+              healthRow(`AE DLC OK: ${nativeCount}/80`, healthAsync.aeDLCOwned && aeDLCInstalled === true, aeDLCInstalled === null
+                ? 'Checking...'
+                : null),
               healthRow('Not a removable drive', !isRemovable, null),
             ),
             // Column 2  
