@@ -316,7 +316,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.5.0 - WiP";
+  const extensionVersion = "1.4.2 - WiP";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
