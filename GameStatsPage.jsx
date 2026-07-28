@@ -1,10 +1,11 @@
 const React = require('react');  
 const { useSelector } = require('react-redux'); 
-const { actions, selectors, util, MainPage } = require('vortex-api');  
+const { actions, selectors, util, fs, MainPage } = require('vortex-api');  
 const path = require('path');  
+const { exec, execFile } = require('child_process');
 const iniFileMap = {  
   skyrim:               ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],  
-  skyrimse:             ['Skyrim Special Edition/Skyrim.ini'],  
+  skyrimse:             ['Skyrim Special Edition/Skyrim.ini', 'Skyrim Special Edition/SkyrimPrefs.ini'],  
   skyrimvr:             ['Skyrim VR/Skyrim.ini', 'Skyrim VR/SkyrimVR.ini', 'Skyrim VR/SkyrimPrefs.ini'],  
   fallout3:             ['Fallout3/Fallout.ini', 'Fallout3/FalloutPrefs.ini', 'Fallout3/FalloutCustom.ini'],  
   fallout4:             ['Fallout4/Fallout4.ini', 'Fallout4/Fallout4Prefs.ini', 'Fallout4/Fallout4Custom.ini'],  
@@ -19,6 +20,13 @@ const iniFileMap = {
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');  
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
+const probePath = path.join(util.getVortexPath('assets_unpacked'), 'dotnetprobe.exe');  
+// MDI icon paths (hardcoded to avoid ES module import issues)  
+const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';  
+const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z'; 
+// Minimum versions considered "current"  
+const MIN_VCPP_MINOR = 20;  // 14.20+ = VC++ 2019 or later  
+const MIN_DOTNET_MAJOR = 9; // .NET 9+  
   
 function getIniPaths(gameId) {  
   const subPaths = iniFileMap[gameId?.toLowerCase()];  
@@ -40,6 +48,77 @@ function ul(...items) {
     ...items.map((text, i) => React.createElement('li', { key: i }, text))  
   );  
 }  
+
+
+let winapi;  
+try { winapi = require('winapi-bindings'); } catch (e) { winapi = null; }  
+  
+ 
+  
+
+  
+function getVcppVersion(arch) {  
+  if (!winapi) return null;  
+  try {  
+    const key = 'SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\' + arch;  
+    const result = winapi.RegGetValue('HKEY_LOCAL_MACHINE', key, 'Version');  
+    return result?.value || null;  
+  } catch (e) {  
+    return null;  
+  }  
+}  
+  
+function isVcppCurrent(version) {  
+  if (!version) return false;  
+  const clean = version.replace(/^v/, '');  
+  const parts = clean.split('.');  
+  const major = parseInt(parts[0], 10);  
+  const minor = parseInt(parts[1], 10);  
+  return major >= 14 && minor >= MIN_VCPP_MINOR;  
+}  
+  
+function isDotNetCurrent(version) {  
+  if (!version) return false;  
+  return parseInt(version.split('.')[0], 10) >= MIN_DOTNET_MAJOR;  
+}
+
+function StatusIcon({ isOk }) {  
+  return React.createElement('svg', {  
+    viewBox: '0 0 24 24',  
+    style: {  
+      width: '14px', height: '14px',  
+      fill: isOk ? '#4caf50' : '#f44336',  
+      flexShrink: 0, marginRight: '6px', verticalAlign: 'middle'  
+    }  
+  }, React.createElement('path', { d: isOk ? MDI_CHECK_CIRCLE : MDI_CLOSE_CIRCLE }));  
+}  
+  
+function sysRow(label, version, isCurrent) {  
+  return React.createElement('div', {  
+    style: { display: 'flex', alignItems: 'left', marginBottom: '4px', fontSize: '12px' }  
+  },  
+    React.createElement(StatusIcon, { isOk: isCurrent }),  
+    React.createElement('span', null,  
+      label + ': ' + (version || 'Not found')  
+    )  
+  );  
+}
+
+function healthRow(label, isGood, detail) {  
+  const icon = isGood  
+    ? React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold' } }, '✔')  
+    : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold' } }, '✘');  
+  
+  return React.createElement('div', {  
+    style: { display: 'flex', alignItems: 'center', marginBottom: '4px' }  
+  },  
+    icon,  
+    React.createElement('span', null, label),  
+    detail  
+      ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em' } }, detail)  
+      : null  
+  );  
+}
 
 // Collapsible FAQ item component  
 function FaqItem({ heading, children }) {  
@@ -129,12 +208,12 @@ function FaqItem({ heading, children }) {
   },  
 ];
 
-  
+//==================Main Function================================================================================= 
 function GameStatsPage({ api }) {  
   const activeGameId  = useSelector((state) => selectors.activeGameId(state));  
   const profile       = useSelector((state) => selectors.activeProfile(state));  
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');  
-  
+  const { useEffect, useState } = React; 
   const gameDiscovery = useSelector((state) => {  
     const gameId = selectors.activeGameId(state);  
     return state?.settings?.gameMode?.discovered?.[gameId] || {};  
@@ -164,20 +243,79 @@ function GameStatsPage({ api }) {
     return state.persistent.gameMode.gameInfo?.[gameId] || {};  
   });  
   
+  //for health checks
+  const needToDeploy = useSelector((state) =>  
+    state.persistent?.deployment?.needToDeploy?.[activeGameId] === true  
+  );   
+  const loadOrder = useSelector((state) => state.loadOrder || {});    
+  const primaryToolId   = useSelector((state) =>  
+    state.settings?.interface?.primaryTool?.[activeGameId] ?? null  
+  );
+  const primaryToolPath = useSelector((state) =>  
+    state.settings?.gameMode?.discovered?.[activeGameId]?.tools?.[primaryToolId]?.path  
+  );
+  const isSKSEPrimary = primaryToolPath  
+    ? path.basename(primaryToolPath).toLowerCase() === 'skse64_loader.exe'  
+    : false;  
+  const discoveredTools = useSelector((state) =>  
+    state.settings?.gameMode?.discovered?.[activeGameId]?.tools ?? {}  
+  );  
+  const allMods = useSelector((state) =>  
+    state.persistent?.mods?.[activeGameId] ?? {}  
+  );
+  
   const spaceUsed     = gameInfo?.size?.value;  
   const spaceNoLinks  = gameInfo?.size_nolinks?.value;  
   
 // Format with Vortex's built-in formatter  
   const spaceUsedStr    = spaceUsed    != null ? util.bytesToString(spaceUsed)    : 'Calculating...';  
   const spaceNoLinksStr = spaceNoLinks != null ? util.bytesToString(spaceNoLinks) : 'Calculating...';
+
   
+  const [runtimeInfo, setRuntimeInfo] = useState({ vcx64: null, vcx86: null, }); //dotnet: null });  
+  
+  useEffect(() => {  
+    const vcx64 = getVcppVersion('x64');  
+    const vcx86 = getVcppVersion('x86'); 
+	setRuntimeInfo(prev => ({ ...prev, vcx64, vcx86 }));  
+	
+	const child = execFile(probePath, ['8']); // check for .NET 8+  
+  
+    let stdout = '';  
+    let stderr = '';  
+    child.stdout?.on('data', (d) => stdout += d);  
+    child.stderr?.on('data', (d) => stderr += d);  
+  
+    /* removing dotnet check for now. it's unneeded
+    child.on('close', (exitCode) => {  
+      if (exitCode === 0) {  
+        // Parse "Success: Found .NET 9.0.17" -> "9.0.17"  
+        const match = stdout.match(/Found \.NET (\S+)/);  
+        setRuntimeInfo(prev => ({  
+        ...prev,  
+        dotnet: match ? match[1] : 'Unknown',  
+      }));  
+    } else {  
+      setRuntimeInfo(prev => ({ ...prev, dotnet: 'Not found' }));  
+    }  
+  });   
+  
+    child.on('error', () => resolve({ version: 'Not found', ok: false }));  
+  */   
+  
+    },
+  
+  []);
+  
+
+
   const allProfiles = useSelector((state) => state?.persistent?.profiles || {});  
   
   const pluginList = useSelector((state) => state?.session?.plugins?.pluginList || {});  
   const pluginInfo = useSelector((state) => state?.session?.plugins?.pluginInfo || {});  
-  const loadOrder  = useSelector((state) => state?.loadOrder || {});  
+  //const loadOrder  = useSelector((state) => state?.loadOrder || {});  
   
-  const { useEffect, useState } = React;  
+ 
   
 // State to track if game path is on removable drive  
   const [isRemovable, setIsRemovable] = useState(false);  
@@ -188,7 +326,6 @@ function GameStatsPage({ api }) {
   
     const checkRemovable = async () => {  
       try {  
-        const winapi = require('winapi-bindings');  
         const volume = winapi.GetVolumePathName(gamePath);  
           
         const drivelist = require('drivelist').list;  
@@ -207,7 +344,9 @@ function GameStatsPage({ api }) {
   
     checkRemovable();  
   }, [gameDiscovery?.path]);
-  
+
+
+
 // Check if the welcome notification has been suppressed  
 	const isSuppressed = useSelector((state) =>   
 	  state?.settings?.notifications?.suppress?.['game-stats-welcome'] === true  
@@ -217,9 +356,16 @@ function GameStatsPage({ api }) {
   if (!isSuppressed) {  
     api.showDialog(  
       'info',  
-      'Welcome to Immersive Support',  {  
-        htmlText: '<h4 style="margin-top:0">Important things to remember for I&amp;A:</h4>'
-		  + '<br><br>'
+      'Welcome to Immersive Support',  
+      {  
+        htmlText: '<style>'
+          + '#game-stats-welcome { display: flex !important; align-items: center; }'  
+          + '#game-stats-welcome .modal-dialog { margin: auto !important; height: auto !important; }'  
+          + '#game-stats-welcome .dialog-container { min-height: 0 !important; }'  
+          + '#game-stats-welcome .dialog-content-html { flex: 0 0 auto !important; }' 
+          + '</style>'
+          + '<h4 style="margin-top:0">Important things to remember for I&amp;A:</h4>'
+		      + '<br><br>'
           + '<ul style="margin:0;padding-left:20px;list-style-type:disc">'  
           + '<li>Profiles are not separate</li>'  
           + '<li>Mods or collections in other profiles will almost always prevent the collection from starting</li>'  
@@ -236,7 +382,7 @@ function GameStatsPage({ api }) {
           + '</ul></li>'  
           + '<li>The collection uses Pandora for animations — FNIS or Nemesis should not be installed or run</li>'  
           + '</ul>' 
-		  + '<br><br>'
+		      + '<br><br>'
           + '<h4 style="margin-bottom:0"><strong>Screenshot everything above the Troubleshooting section for the Discord Support Team</strong></h4>',
         checkboxes: [  
           {  
@@ -255,6 +401,98 @@ function GameStatsPage({ api }) {
     });  
   }  
 }, [isSuppressed, api]);
+
+const [healthAsync, setHealthAsync] = useState({  
+  updateAvailable: null,   // null = checking  
+  iniPresent: null,  
+  shaderCachePresent: null,  
+});  
+  
+useEffect(() => {  
+  // --- Vortex update check ---  
+  if (window.api?.updater?.getStatus) {  
+    window.api.updater.getStatus()  
+      .then((status) => setHealthAsync((p) => ({ ...p, updateAvailable: status.available })))  
+      .catch(() => setHealthAsync((p) => ({ ...p, updateAvailable: false })));  
+  } else {  
+    setHealthAsync((p) => ({ ...p, updateAvailable: false }));  
+  }  
+  
+  // --- INI files present ---  
+  console.log('Checking INI files for gameId:', activeGameId, 'paths:', iniPaths);
+  const checkIniFiles = async () => {  
+    const results = await Promise.all(  
+      iniPaths.map(p =>  
+        fs.statAsync(p)  
+          .then((stats) => stats.size > 0)  
+          .catch(() => false)  
+      )  
+    );
+  console.log('INI results:', results);  
+  const iniOk = iniPaths.length > 0 && results.every(r => r === true);  
+  console.log('iniOk: ', iniOk);
+  setHealthAsync((p) => ({ ...p, iniPresent: iniOk }));  
+};  
+  
+  checkIniFiles();
+ 
+/*
+  // --- Shader cache present ---  
+  const shaderCacheMap = {  
+    skyrim:    path.join(process.env.LOCALAPPDATA, 'Skyrim', 'ShaderCache'),  
+    skyrimse:  path.join(gamePath, 'Data', 'ShaderCache'),  
+    skyrimvr:  path.join(process.env.LOCALAPPDATA, 'Skyrim VR', 'ShaderCache'),  
+    fallout4:  path.join(process.env.LOCALAPPDATA, 'Fallout4', 'ShaderCache'),  
+    fallout4vr:path.join(process.env.LOCALAPPDATA, 'Fallout4VR', 'ShaderCache'),  
+  };  
+  const scPath = shaderCacheMap[activeGameId?.toLowerCase()];  
+  let scOk = false;  
+  if (scPath) {  
+    try { require('fs').statSync(scPath); scOk = true; } catch {}  
+  }  
+  setHealthAsync((p) => ({ ...p, shaderCachePresent: scOk }));  
+*/  
+}, [iniPaths, activeGameId]);
+
+// Deployment  
+const isDeployed = !needToDeploy;  
+  
+// Auto-sort (best available proxy for "plugins sorted")  
+// const isSorted = autoSortEnabled; 
+
+ const pluginsSorted = useSelector((state) =>  
+  state?.persistent?.immersiveSupport?.pluginsSorted === true  
+ ); 
+  
+// Game launched (INI + shader cache)  
+const gameLaunched = healthAsync.iniPresent === true && healthAsync.shaderCachePresent === true;  
+  
+// OneDrive in INI path  
+const hasOneDrive = iniPaths.some((p) => p.toLowerCase().includes('onedrive'));  
+  
+// Vortex update pending (non-beta)  
+const updatePending = healthAsync.updateAvailable === true;  
+  
+// SKSE64 as primary tool  
+// Tool IDs from script-extender-installer gameSupport.ts  
+const xseToolIdMap = {  
+  skyrim: 'skse', skyrimse: 'skse64', skyrimvr: 'sksevr',  
+  fallout4: 'f4se', fallout4vr: 'F4SEVR', falloutnv: 'nvse',  
+};  
+const expectedXseId = xseToolIdMap[activeGameId?.toLowerCase()];  
+const isXsePrimary = expectedXseId  
+  ? primaryToolId === expectedXseId  
+  : primaryToolId !== null;  
+  
+// FNIS or Nemesis installed and enabled  
+const hasFnisOrNemesis = Object.entries(allMods).some(([modId, mod]) => {  
+  const name = (mod.attributes?.name || mod.id || '').toLowerCase();  
+  const isBad = name.includes('fnis') ||  
+    name.includes('nemesis unlimited behavior engine') ||  
+    name.includes('nemesis behavior engine');  
+  const isEnabled = profile?.modState?.[modId]?.enabled === true;  
+  return isBad && isEnabled;  
+});
   
 //Build a map of modId -> [collectionMod, ...]
 const collectionMap = {};  
@@ -406,12 +644,12 @@ const neverInstalledCount = regularMods.filter(m =>
 		React.createElement('h2', null, 'Vital Statistics'),  
         row('Vortex Version: ', vortexVersion),  
         React.createElement('hr', null),  
-		
-	React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },  
   
-  // Column 1: Path/folder data  
-	  React.createElement('div', { style: { flex: '1' } },  	
-        row('Active Game: ', gameName),  
+    React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },  
+  
+		// Column 1: Path/folder data  
+	  React.createElement('div', { style: { flex: '1' } },  
+		row('Active Game: ', gameName),  
         row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
 		row('Staging Folder: ', stagingPath || 'Not configured'),
         React.createElement('div', { style: { marginBottom: '10px' } },  
@@ -421,47 +659,64 @@ const neverInstalledCount = regularMods.filter(m =>
                 ...iniPaths.map(p => React.createElement('li', { key: p }, p))  
               )  
             : React.createElement('span', null, ' Not available for this game')  
-          ),
+        ),
 	  ),
-	  
-  // Column 2: Space used data (right column)  
-	  React.createElement('div', { style: { flexShrink: 0, textAlign: 'right', minWidth: '220px' } },  
-		React.createElement('div', { style: { marginBottom: '4px' } },  
+	  // Column 2  
+	  React.createElement('div', { style: { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '8px' } },  
+	  React.createElement('div', null,  
 		  React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used: '),  
 		  React.createElement('span', null, spaceUsedStr)  
-      ),  
-      React.createElement('div', null,  
-        React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used (No Symlinks): '),  
-        React.createElement('span', null, spaceNoLinksStr)    
-		),
-	  )
-	)
-        React.createElement('hr', null),  
-  
-        React.createElement('div', { style: { marginBottom: '10px' } },  
-          React.createElement('strong', null,),
-		  row('Enabled Mods: ', `${enabledModsCount}`),
-		  row('Disabled Mods: ', `${disabledCount}`),
+	  ),  
+	  React.createElement('div', null,  
+		  React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used (No Links): '),  
+		  React.createElement('span', null, spaceNoLinksStr)  
+	  ),  
+	  healthRow('VC++ x64', runtimeInfo.vcx64, isVcppCurrent(runtimeInfo.vcx64)),  
+	  healthRow('VC++ x86', runtimeInfo.vcx86, isVcppCurrent(runtimeInfo.vcx86)),  
+	  //sysRow('.NET Desktop', runtimeInfo.dotnet, isDotNetCurrent(runtimeInfo.dotnet)),  
+	  ),
+      ),
+    
+	    React.createElement('hr', null),  
+	
+	React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } }, 
+		// Column 1
+        React.createElement('div', { style: { flex: '1' }},   
+        React.createElement('strong', null,),
+		    row('Enabled Mods: ', `${enabledModsCount}`),
+		    row('Disabled Mods: ', `${disabledCount}`),
           React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },  
             ...Object.entries(collectionCounts).map(([name, count]) =>  
               React.createElement('li', { key: name }, `${name}: ${count}`)  
             ),  
             React.createElement('li', { key: '__none__' }, `None: ${noneCount}`)  
-          )  
+          ),  
         ),  
+		
+		//Column 2
+	  React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
         row('Total Active Plugins: ', activePlugins.length),  
-		row('Disabled Plugins: ', disabledPlugins.length),
+		    row('Disabled Plugins: ', disabledPlugins.length),
         row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),  
         row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),  
-        React.createElement('hr', null),  
-  
+    ),
+	),
+		React.createElement('hr', null),
+		
+	React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },
+		//column 1
+		React.createElement('div', { style: { flex: '1' }},
         row('Active Profile: ', profileName),  
         React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },  
 		  ...gameProfiles.map((p) =>  
 			React.createElement('li', { key: p.id }, `${p.name} (${profileModCounts[p.id] || 0})`)  
 		  )  
-		),  
-        React.createElement('div', { style: { marginBottom: '10px' } },  
+		),
+		),
+		
+		//column 2
+		React.createElement('div', { style: { marginBottom: '10px' } },  
+          React.createElement('div', { style: { marginBottom: '10px' } },  
           React.createElement('strong', null, `Installed Collections (${collectionCount}):`),  
           collectionCount > 0  
             ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },  
@@ -472,20 +727,50 @@ const neverInstalledCount = regularMods.filter(m =>
                 )  
               )  
             : React.createElement('span', null, ' None')  
-        ),  
-          
+          ),
 		),
-        React.createElement('h3', null, 'Troubleshooting'),  
-        React.createElement('p', { style: { marginBottom: '12px', fontStyle: 'italic' } },  
-          'Stop. Do not remove or reinstall things on the first error prompt you are seeing. ' +  
-          'This is not a Commodore 64 — hitting the PC or redoing the same things won\'t result in a different outcome. ' +  
-          'Most errors you get are explained below. You\'ll be able to solve most of them.'  
-        ),  
-        ...faqItems.map((item, i) =>  
-          React.createElement(FaqItem, { key: i, heading: item.heading }, item.content)  
-        )  
-      )  
+		),
+		),
+		
+// ── Health Checks ──────────────────────────────────────────────────────────  
+	React.createElement('div', {  
+    style: {  
+      border: '2px solid orange',  
+	  borderRadius: '6px',  
+      padding: '12px',  
+	  marginBottom: '16px',  
+    }  
+  },  
+    React.createElement('h3', { style: { marginTop: 0, marginBottom: '12px' } }, 'Health Checks'),  
+    React.createElement('div', {  
+      style: { display: 'flex', gap: '32px', justifyContent: 'center' }  
+    },  
+// Column 1  
+      React.createElement('div', { style: { flex: '0 0 auto' } },  
+        healthRow('Mods Deployed', !needToDeploy),  
+        healthRow('Plugins Sorted', pluginsSorted, false),  
+        healthRow('Game Launched Once', gameLaunched, healthAsync.iniPresent === null),  
+        healthRow('OneDrive NOT in INI Path',!hasOneDrive, false),  
+      ),  
+      // Column 2  
+      React.createElement('div', { style: { flex: '0 0 auto' } },  
+        healthRow('No Vortex Update Pending',!updatePending, healthAsync.updateAvailable === null),  
+        healthRow('SKSE64 is Primary Tool', isSKSEPrimary, false),  
+        healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),  
+      ),  
     )  
+  ),
+    React.createElement('h3', null, 'Troubleshooting'),  
+      React.createElement('p', { style: { marginBottom: '12px', fontStyle: 'italic' } },  
+      'Stop. Do not remove or reinstall things on the first error prompt you are seeing. ' +  
+      'This is not a Commodore 64 — hitting the PC or redoing the same things won\'t result in a different outcome. ' +  
+      'Most errors you get are explained below. You\'ll be able to solve most of them.'  
+    ),  
+     ...faqItems.map((item, i) =>  
+       React.createElement(FaqItem, { key: i, heading: item.heading }, item.content)  
+     )  
+        
+    ))  
   );  
 }  
   
