@@ -21,6 +21,18 @@ const iniFileMap = {
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
+const filesToSkip = new Set([
+  '__folder_managed_by_vortex',
+  'vortex.deployment.json',
+  'vortex.deployment.msgpack',
+  'vortex.deployment.json.bak',
+  'vortex.deployment.msgpack.bak',
+  'user.json.vortex_backup',
+  'user.json',
+]);
+
+
+
 // MDI icon paths (hardcoded to avoid ES module import issues)  
 const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
 const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';
@@ -80,7 +92,7 @@ function isVcppCurrent(version) {
   return major >= 14 && minor >= MIN_VCPP_MINOR;
 }
 
-  
+
 
 function StatusIcon({ isOk }) {
   return React.createElement('svg', {
@@ -225,7 +237,7 @@ const faqItems = [
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.3.0";
+  const extensionVersion = "1.3.1";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -239,7 +251,8 @@ function GameStatsPage({ api }) {
   });
   const profile = useSelector((state) => selectors.activeProfile(state));
 
-  
+
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
 
   const { useEffect, useState, useRef } = React;
@@ -262,45 +275,45 @@ function GameStatsPage({ api }) {
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
 
-  const [cpuInfo, setCpuInfo] = React.useState('Loading...');  
-  const [ramInfo, setRamInfo] = React.useState('Loading...');  
+  const [cpuInfo, setCpuInfo] = React.useState('Loading...');
+  const [ramInfo, setRamInfo] = React.useState('Loading...');
   const [gpuInfo, setGpuInfo] = React.useState('Loading...');
 
 
-  React.useEffect(() => {  
-  // CPU — os.cpus() is synchronous  
-  const cpus = os.cpus();  
-  if (cpus && cpus.length > 0) {  
-    setCpuInfo(cpus[0].model.trim());  
-  }  
-  
-  // RAM — os.totalmem() is synchronous, returns bytes  
-  const totalRamGB = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(1);  
-  setRamInfo(totalRamGB + ' GB');  
-  
-  // GPU — requires PowerShell  
-  exec(  
-  'powershell -NoProfile -NonInteractive -Command "'  
-  + '$gpu = (Get-WmiObject Win32_VideoController | Select-Object -First 1).Name; '  
-  + '$regBase = \'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\'; '  
-  + '$vram = 0; '  
-  + 'Get-ChildItem $regBase -ErrorAction SilentlyContinue | ForEach-Object { '  
-  + '  $desc = (Get-ItemProperty $_.PSPath -Name DriverDesc -ErrorAction SilentlyContinue).DriverDesc; '  
-  + '  if ($desc -and $gpu -and ($desc -like (\'*\' + $gpu + \'*\') -or $gpu -like (\'*\' + $desc + \'*\'))) { '  
-  + '    $v = (Get-ItemProperty $_.PSPath -Name \'HardwareInformation.qwMemorySize\' -ErrorAction SilentlyContinue).\'HardwareInformation.qwMemorySize\'; '  
-  + '    if ($v) { $vram = $v } '  
-  + '  } '  
-  + '}; '  
-  + 'Write-Output ($gpu + \' | \' + [math]::Round($vram / 1GB, 0) + \' GB\')"',
-  (err, stdout) => {  
-    if (err || !stdout.trim()) {  
-      setGpuInfo('Unknown');  
-      return;  
-    }  
-    setGpuInfo(stdout.trim());  
-  }  
-);  
-}, []);
+  React.useEffect(() => {
+    // CPU — os.cpus() is synchronous  
+    const cpus = os.cpus();
+    if (cpus && cpus.length > 0) {
+      setCpuInfo(cpus[0].model.trim());
+    }
+
+    // RAM — os.totalmem() is synchronous, returns bytes  
+    const totalRamGB = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(1);
+    setRamInfo(totalRamGB + ' GB');
+
+    // GPU — requires PowerShell  
+    exec(
+      'powershell -NoProfile -NonInteractive -Command "'
+      + '$gpu = (Get-WmiObject Win32_VideoController | Select-Object -First 1).Name; '
+      + '$regBase = \'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\'; '
+      + '$vram = 0; '
+      + 'Get-ChildItem $regBase -ErrorAction SilentlyContinue | ForEach-Object { '
+      + '  $desc = (Get-ItemProperty $_.PSPath -Name DriverDesc -ErrorAction SilentlyContinue).DriverDesc; '
+      + '  if ($desc -and $gpu -and ($desc -like (\'*\' + $gpu + \'*\') -or $gpu -like (\'*\' + $desc + \'*\'))) { '
+      + '    $v = (Get-ItemProperty $_.PSPath -Name \'HardwareInformation.qwMemorySize\' -ErrorAction SilentlyContinue).\'HardwareInformation.qwMemorySize\'; '
+      + '    if ($v) { $vram = $v } '
+      + '  } '
+      + '}; '
+      + 'Write-Output ($gpu + \' | \' + [math]::Round($vram / 1GB, 0) + \' GB\')"',
+      (err, stdout) => {
+        if (err || !stdout.trim()) {
+          setGpuInfo('Unknown');
+          return;
+        }
+        setGpuInfo(stdout.trim());
+      }
+    );
+  }, []);
 
   //for health checks
   const suppressedNotifications = useSelector((state) =>
@@ -331,9 +344,9 @@ function GameStatsPage({ api }) {
     .filter(tool => tool.path != null && tool.hidden !== true)
     .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
 
-    const MAX_VISIBLE_TOOLS = 5;  
-  const [toolsExpanded, setToolsExpanded] = React.useState(false);  
-  
+  const MAX_VISIBLE_TOOLS = 5;
+  const [toolsExpanded, setToolsExpanded] = React.useState(false);
+
   const visibleTools = toolsExpanded ? toolList : toolList.slice(0, MAX_VISIBLE_TOOLS);
 
   const spaceUsed = gameInfo?.size?.value;
@@ -351,7 +364,7 @@ function GameStatsPage({ api }) {
     const vcx86 = getVcppVersion('x86');
     setRuntimeInfo(prev => ({ ...prev, vcx64, vcx86 }));
 
-   },[]);
+  }, []);
 
   const pluginList = useSelector((state) => state?.session?.plugins?.pluginList || {});
   const pluginInfo = useSelector((state) => state?.session?.plugins?.pluginInfo || {});
@@ -533,7 +546,7 @@ function GameStatsPage({ api }) {
   const xseTool = expectedXseId ? discoveredTools[expectedXseId] : undefined;
 
   // Determine status  
-  
+
   let xseStatus = null;  // no flags = configured  
   if (!expectedXseId) {
     xseStatus = null;  // not a Skyrim variant — don't show the row at all  
@@ -543,155 +556,97 @@ function GameStatsPage({ api }) {
     xseStatus = 'hidden';
   }
 
-// Check if the binary actually exists at the expected location  
-const xseExecutable = xseTool?.path?.replace(/^.*[\\/]/, '') ?? null;  
-const expectedXsePath = gamePath && xseExecutable ? path.join(gamePath, xseExecutable) : null;
-  
-// You need to do this check asynchronously  
-const [xseExistsAtExpected, setXseExistsAtExpected] = useState(false);  
-const [xseExistsAtStored, setXseExistsAtStored] = useState(false);  
-const [unmanagedFiles, setUnmanagedFiles] = useState({  
-  plugins: [], dlls: [], textures: [], meshes: [], animations: [], loading: false,  
-});
+  // Check if the binary actually exists at the expected location  
+  const xseExecutable = xseTool?.path?.replace(/^.*[\\/]/, '') ?? null;
+  const expectedXsePath = gamePath && xseExecutable ? path.join(gamePath, xseExecutable) : null;
 
-  
-useEffect(() => {  
-  if (!expectedXsePath) return;  
-  fs.statAsync(expectedXsePath)  
-    .then(() => setXseExistsAtExpected(true))  
-    .catch(() => setXseExistsAtExpected(false));  
-  
-  if (xseTool?.path) {  
-    fs.statAsync(xseTool.path)  
-      .then(() => setXseExistsAtStored(true))  
-      .catch(() => setXseExistsAtStored(false));  
-  }  
-}, [expectedXsePath, xseTool?.path]); 
+  // You need to do this check asynchronously  
+  const [xseExistsAtExpected, setXseExistsAtExpected] = useState(false);
+  const [xseExistsAtStored, setXseExistsAtStored] = useState(false);
 
-useEffect(() => {  
-  if (!gamePath || gamePath === 'Not discovered') return;  
-  
-  const dataPath = path.join(gamePath, 'Data');  
-  setUnmanagedFiles(prev => ({ ...prev, loading: true }));  
-  
-  // Build set of native plugin names to exclude  
-  const nativeNames = new Set(  
-    Object.keys(pluginList)  
-      .filter(id => pluginList[id]?.isNative)  
-      .map(id => id.toLowerCase())  
+
+  const [rawUnmanaged, setRawUnmanaged] = useState({ plugins: [], animations: [], meshes: [], textures: [], dlls: [], loading: true });
+  const unmanagedFiles = React.useMemo(() => ({
+    ...rawUnmanaged,
+    plugins: rawUnmanaged.plugins.filter(f => !pluginList[f.name.toLowerCase()]?.isNative),
+  }), [rawUnmanaged, pluginList]);
+
+
+  useEffect(() => {
+    console.log('====scan triggered, gamePath:', gamePath, 'activeGameId:', activeGameId);
+    if (!gamePath || gamePath === 'Not discovered') return;
+    setRawUnmanaged(prev => ({ ...prev, loading: true }));
+    function walkUnmanaged(dirPath, maxDepth) {
+      if (maxDepth <= 0) return Promise.resolve([]);
+      return fs.readdirAsync(dirPath)
+        .then(entries => Promise.all(
+          entries.map(entry => {
+            if (filesToSkip.has(entry)) return Promise.resolve([]);
+            const fullPath = path.join(dirPath, entry);
+            return fs.statAsync(fullPath)
+              .then(stats => {
+                if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
+                return stats.nlink <= 1
+                  ? [{ name: entry, parentDir: path.basename(dirPath) }]
+                  : [];
+              })
+              .catch(() => []);
+          })
+        ))
+        .then(results => [].concat(...results))
+        .catch(() => []);
+    }
+
+    const dataPath = path.join(gamePath, 'Data');
+
+    const scanPlugins = walkUnmanaged(dataPath, 1).then(files =>
+      files.filter(f => ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))
     );
 
-  const VORTEX_FILES = new Set([  
-  '__folder_managed_by_vortex',  
-  'vortex.deployment.json',  
-  'vortex.deployment.msgpack',  
-  'vortex.deployment.json.bak',
-  'vortex.deployment.msgpack.bak',  
-  'vortex.deployment.json.old',
-  'vortex.deployment.msgpack.old',  
-  'vortex.deployment.json.bak.old',]);  
-  
-  
-  // Recursively walk a directory, returning files with nlink <= 1  
-  function walkUnmanaged(dirPath, maxDepth) {  
-    if (maxDepth <= 0) return Promise.resolve([]);  
-    return fs.readdirAsync(dirPath)  
-      .then(entries => Promise.all(  
-        entries.map(entry => {  
-          const fullPath = path.join(dirPath, entry);  
-          return fs.statAsync(fullPath)  
-            .then(stats => {  
-              if (stats.isDirectory()) {  
-                return walkUnmanaged(fullPath, maxDepth - 1);  
-              } 
-              if (VORTEX_FILES.has(path.basename(entry.filePath))) return; 
-              return stats.nlink <= 1  
-                ? [{ name: entry, parentDir: path.basename(dirPath) }]  
-                : [];  
-            })  
-            .catch(() => []);  
-        })  
-      ))  
-      .then(results => [].concat(...results))  
-      .catch(() => []);  
-  }  
-  
-  const pluginExts = new Set(['.esp', '.esm', '.esl']);  
-  
-  // Plugins: Data root only, native plugins excluded  
-  const scanPlugins = fs.readdirAsync(dataPath)  
-    .then(entries => Promise.all(  
-      entries.map(entry => {  
-        if (!pluginExts.has(path.extname(entry).toLowerCase())) return Promise.resolve([]);  
-        if (nativeNames.has(entry.toLowerCase())) return Promise.resolve([]);  
-        const fullPath = path.join(dataPath, entry);  
-        return fs.statAsync(fullPath)  
-          .then(stats => stats.nlink <= 1 ? [{ name: entry, parentDir: 'Data' }] : [])  
-          .catch(() => []);  
-      })  
-    ))  
-    .then(results => [].concat(...results))  
-    .catch(() => []);  
-  
-  // DLLs: Data root + SKSE\Plugins subfolder (depth 1)  
-  const scanDlls = Promise.all([  
-    fs.readdirAsync(dataPath)  
-      .then(entries => Promise.all(  
-        entries.map(entry => {  
-          if (path.extname(entry).toLowerCase() !== '.dll') return Promise.resolve([]);  
-          const fullPath = path.join(dataPath, entry);  
-          return fs.statAsync(fullPath)  
-            .then(stats => stats.nlink <= 1 ? [{ name: entry, parentDir: 'Data' }] : [])  
-            .catch(() => []);  
-        })  
-      ))  
-      .then(r => [].concat(...r))  
-      .catch(() => []),  
-    walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1)  
-      .then(files => files.filter(f => path.extname(f.name).toLowerCase() === '.dll')),  
-  ]).then(([root, skse]) => root.concat(skse));  
-  
-  // Textures: Data\textures (depth 5)  
-  const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 5);  
-  
-  // Meshes + Animations: Data\meshes (depth 5)  
-  // .hkx/.hkb files or files in a folder named "animations" are counted as animations  
-  const animExts = new Set(['.hkx', '.hkb']);  
-  const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 5)  
-    .then(files => {  
-      const meshes = [];  
-      const animations = [];  
-      files.forEach(f => {  
-        if (animExts.has(path.extname(f.name).toLowerCase()) ||  
-            f.parentDir.toLowerCase() === 'animations') {  
-          animations.push(f);  
-        } else {  
-          meshes.push(f);  
-        }  
-      });  
-      return { meshes, animations };  
-    })  
-    .catch(() => ({ meshes: [], animations: [] }));  
-  
-  Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])  
-    .then(([plugins, dlls, textures, meshesAndAnims]) => {  
-      setUnmanagedFiles({  
-        plugins,  
-        dlls,  
-        textures,  
-        meshes: meshesAndAnims.meshes,  
-        animations: meshesAndAnims.animations,  
-        loading: false,  
-      });  
-    })  
-    .catch(() => {  
-      setUnmanagedFiles(prev => ({ ...prev, loading: false }));  
-    });  
-}, [gamePath, activeGameId, pluginList]);
-  
-const showRestoreButton =  
-  xseTool?.hidden === true ||  
-  (xseExistsAtExpected && !xseExistsAtStored); // binary moved, stored path is stale
+    const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>
+      files.filter(f => path.extname(f.name).toLowerCase() === '.dll')
+    );
+
+    const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 10).then(files =>
+      files.filter(f => ['.dds', '.png'].includes(path.extname(f.name).toLowerCase()))
+    );
+
+    const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 10)
+      .then(files => {
+        const meshes = [];
+        const animations = [];
+        files.forEach(f => {
+          const ext = path.extname(f.name).toLowerCase();
+          if (ext === '.hkx' || ext === '.hkb' || f.parentDir.toLowerCase() === 'animations') {
+            animations.push(f);
+          } else {
+            meshes.push(f);
+          }
+        });
+        return { meshes, animations };
+      })
+      .catch(() => ({ meshes: [], animations: [] }));
+
+    Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
+      .then(([plugins, dlls, textures, meshesAndAnims]) => {
+        setRawUnmanaged({
+          plugins,
+          dlls,
+          textures,
+          meshes: meshesAndAnims.meshes,
+          animations: meshesAndAnims.animations,
+          loading: false,
+        });
+      })
+      .catch(() => {
+        setRawUnmanaged(prev => ({ ...prev, loading: false }));
+      });
+  }, [gamePath, activeGameId, refreshKey]);
+
+
+  const totalUnmanaged = unmanagedFiles.plugins.length + unmanagedFiles.dlls.length +
+    unmanagedFiles.textures.length + unmanagedFiles.meshes.length + unmanagedFiles.animations.length;
+  const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
 
   // FNIS or Nemesis installed and enabled  
   const hasFnisOrNemesis = Object.entries(mods).some(([modId, mod]) => {
@@ -790,9 +745,9 @@ const showRestoreButton =
     loadOrder[id]?.enabled === true || pluginList[id]?.isNative === true;
 
   // A plugin is disabled if it exists on disk, is not native, and is not active  
-  const disabledPlugins = Object.keys(pluginList).filter(
+  const disabledPlugins = React.useMemo(() => Object.keys(pluginList).filter(
     (id) => !pluginList[id]?.isNative && !isActive(id)
-  );
+  ), [pluginList]);
 
   const isValid = (id) =>
     (pluginList[id]?.deployed === true || pluginList[id]?.isNative === true) && isActive(id);
@@ -803,9 +758,9 @@ const showRestoreButton =
     return filePath.toLowerCase().endsWith('.esl');
   };
 
-  const activePlugins = Object.keys(pluginList).filter(isValid);
-  const lightPlugins = eslGame ? activePlugins.filter(isLight) : [];
-  const regularPlugins = activePlugins.filter((id) => !isLight(id));
+  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList]);
+  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins]);
+  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins]);
 
   const regularLimit = eslGame ? 254 : 255;
   const lightLimit = 4096;
@@ -839,42 +794,42 @@ const showRestoreButton =
   );
   const collectionCount = installedCollections.length;
 
-function showUnmanagedDialog() {  
-  const categories = [  
-    { label: 'Plugins', files: unmanagedFiles.plugins },  
-    { label: 'DLLs', files: unmanagedFiles.dlls },  
-    { label: 'Textures', files: unmanagedFiles.textures },  
-    { label: 'Meshes', files: unmanagedFiles.meshes },  
-    { label: 'Animations', files: unmanagedFiles.animations },  
-  ].filter(cat => cat.files.length > 0);  
-  
-  const htmlContent = categories.length > 0  
-    ? categories.map(cat => 
-         `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
-        + `<ul style="margin:0;padding-left:20px">` 
+  function showUnmanagedDialog() {
+    const categories = [
+      { label: 'Plugins', files: unmanagedFiles.plugins },
+      { label: 'DLLs', files: unmanagedFiles.dlls },
+      { label: 'Textures', files: unmanagedFiles.textures },
+      { label: 'Meshes', files: unmanagedFiles.meshes },
+      { label: 'Animations', files: unmanagedFiles.animations },
+    ].filter(cat => cat.files.length > 0);
+
+    const htmlContent = categories.length > 0
+      ? categories.map(cat =>
+        `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
+        + `<ul style="margin:0;padding-left:20px">`
         + cat.files.map(f => `<li>${f.parentDir}\\${f.name}</li>`).join('')
         + `</ul>`
-      ).join('')  
-    : '<p>No unmanaged files detected.</p>';  
-  
-  api.showDialog(  
-    'info',  
-    'Unmanaged Files (hardlink count \u2264 1)',  
-    { htmlText: '<style>'
+      ).join('')
+      : '<p>No unmanaged files detected.</p>';
+
+    api.showDialog(
+      'info',
+      'Unmanaged Files (hardlink count \u2264 1)',
+      {
+        htmlText: '<style>'
           + '#game-stats-unmanaged { display: flex !important; align-items: center; }'
           + '#game-stats-unmanaged .modal-dialog { margin: auto !important; height: auto !important; }'
           + '#game-stats-unmanaged .dialog-container { min-height: 0 !important; }'
           + '#game-stats-unmanaged .dialog-content-html { flex: 0 0 auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
-          + '</style>' 
-          + htmlContent },  
-    [{ label: 'Close' }],
-    'game-stats-unmanaged'  
-  );  
-}  
-  
-const totalUnmanaged = unmanagedFiles.plugins.length + unmanagedFiles.dlls.length +  
-  unmanagedFiles.textures.length + unmanagedFiles.meshes.length + unmanagedFiles.animations.length;  
-const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
+          + '</style>'
+          + htmlContent
+      },
+      [{ label: 'Close' }],
+      'game-stats-unmanaged'
+    );
+  }
+
+
 
   //=========================== Render the page  ==========================================================
 
@@ -936,30 +891,30 @@ const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
         },
           React.createElement('h2', null, 'Immersive Support - Support Stats ', extensionVersion),
           row('Vortex Version: ', vortexVersion),
-          React.createElement('div', {  
-  style: {  
-    position: 'absolute',  
-    top: '12px',  
-    right: '12px',  
-    textAlign: 'right',  
-    fontSize: '12px',  
-    opacity: 0.75,  
-    lineHeight: '1.6',  
-  }  
-},  
-  React.createElement('div', null,  
-    React.createElement('strong', null, 'CPU: '),  
-    cpuInfo  
-  ),  
-  React.createElement('div', null,  
-    React.createElement('strong', null, 'RAM: '),  
-    ramInfo  
-  ),  
-  React.createElement('div', null,  
-    React.createElement('strong', null, 'GPU: '),  
-    gpuInfo  
-  )  
-),
+          React.createElement('div', {
+            style: {
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              textAlign: 'right',
+              fontSize: '12px',
+              opacity: 0.75,
+              lineHeight: '1.6',
+            }
+          },
+            React.createElement('div', null,
+              React.createElement('strong', null, 'CPU: '),
+              cpuInfo
+            ),
+            React.createElement('div', null,
+              React.createElement('strong', null, 'RAM: '),
+              ramInfo
+            ),
+            React.createElement('div', null,
+              React.createElement('strong', null, 'GPU: '),
+              gpuInfo
+            )
+          ),
           React.createElement('hr', null),
 
           React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },
@@ -976,12 +931,12 @@ const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
                     ...iniPaths.map(p => React.createElement('li', { key: p }, p))
                   )
                   : React.createElement('span', null, ' Not available for this game'),
-                React.createElement('div', null,  
+                React.createElement('div', null,
                   // React.createElement('strong', null, 'Discovered Tools'),
                   expectedXseId !== undefined
                     ? React.createElement('div', { style: { marginBottom: '4px' } },
                       React.createElement('strong', null, 'SKSE: '),
-                      xseTool && xseTool.path  
+                      xseTool && xseTool.path
                         ? React.createElement('span', {
                           style: { cursor: 'pointer', opacity: 0.8 },
                           title: 'Click to copy path',
@@ -991,51 +946,51 @@ const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
                           }
                         }, xseTool.path)
                         : React.createElement('span', { style: { opacity: 0.6 } }, 'Not found'),
-                      xseStatus === 'hidden'  
-  ? React.createElement('span', {  
-      style: {  
-        marginLeft: '6px',  
-        opacity: 0.6,  
-        fontSize: '0.85em',  
-        fontStyle: 'italic',  
-        cursor: 'pointer',  
-        textDecoration: 'underline',  
-      },  
-      title: 'Click to restore this tool',  
-      onClick: () => {  
-  const store = api.store;  
-  
-  // Step 1: Un-hide the tool (sets hidden: false)  
-  store.dispatch(actions.setToolVisible(activeGameId, expectedXseId, true));  
-  
-  // Step 2: Clear the custom flag so re-discovery can update the path  
-  store.dispatch(actions.addDiscoveredTool(  
-    activeGameId,  
-    expectedXseId,  
-    { ...xseTool, custom: false, hidden: false },  
-    false  
-  ));  
-  
-  // Step 3: Trigger re-discovery to find the actual current path  
-  api.emitAndAwait('discover-tools', activeGameId)  
-    .then(() => {  
-      api.sendNotification({  
-        type: 'success',  
-        message: 'SKSE tool restored and path refreshed',  
-        displayMS: 3000,  
-      });  
-    });  
-}  
-    }, '(hidden — click to restore!)')  
-  : xseStatus  
-    ? React.createElement('span', {  
-        style: { marginLeft: '6px', opacity: 0.6, fontSize: '0.85em', fontStyle: 'italic' }  
-      }, `(${xseStatus})`)  
-    : null
+                      xseStatus === 'hidden'
+                        ? React.createElement('span', {
+                          style: {
+                            marginLeft: '6px',
+                            opacity: 0.6,
+                            fontSize: '0.85em',
+                            fontStyle: 'italic',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                          },
+                          title: 'Click to restore this tool',
+                          onClick: () => {
+                            const store = api.store;
+
+                            // Step 1: Un-hide the tool (sets hidden: false)  
+                            store.dispatch(actions.setToolVisible(activeGameId, expectedXseId, true));
+
+                            // Step 2: Clear the custom flag so re-discovery can update the path  
+                            store.dispatch(actions.addDiscoveredTool(
+                              activeGameId,
+                              expectedXseId,
+                              { ...xseTool, custom: false, hidden: false },
+                              false
+                            ));
+
+                            // Step 3: Trigger re-discovery to find the actual current path  
+                            api.emitAndAwait('discover-tools', activeGameId)
+                              .then(() => {
+                                api.sendNotification({
+                                  type: 'success',
+                                  message: 'SKSE tool restored and path refreshed',
+                                  displayMS: 3000,
+                                });
+                              });
+                          }
+                        }, '(hidden — click to restore!)')
+                        : xseStatus
+                          ? React.createElement('span', {
+                            style: { marginLeft: '6px', opacity: 0.6, fontSize: '0.85em', fontStyle: 'italic' }
+                          }, `(${xseStatus})`)
+                          : null
                     )
                     : null,
 
-)
+                )
               ),
             ),
             // Column 2  
@@ -1075,16 +1030,22 @@ const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
               row('Disabled Plugins: ', disabledPlugins.length),
               row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
               row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),
-              row('Unmanaged Files: ',  
-  unmanagedFiles.loading  
-    ? 'Scanning...'  
-    : React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-      React.createElement('li', null, `${unmanagedFiles.plugins.length} plugins, ${unmanagedFiles.dlls.length} DLLs, ` +  
-        `${unmanagedFiles.textures.length} textures,`),
-      React.createElement('li', null, `${unmanagedFiles.meshes.length} meshes, ` +  
-        `${unmanagedFiles.animations.length} animations`  
-      ),
-              )),
+              row('Unmanaged Files: ',
+                unmanagedFiles.loading
+                  ? 'Scanning...'
+                  : React.createElement('div', null,
+
+                    React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
+                      React.createElement('li', null, `${unmanagedFiles.plugins.length} plugins, ${unmanagedFiles.dlls.length} DLLs, ` +
+                        `${unmanagedFiles.textures.length} textures,`),
+                      React.createElement('li', null, `${unmanagedFiles.meshes.length} meshes, ` +
+                        `${unmanagedFiles.animations.length} animations`
+                      ),),
+                    React.createElement('button', {
+                      onClick: () => setRefreshKey(k => k + 1),
+                      className: 'btn btn-default btn-xs', style: { marginRight: '6px' }
+                    }, 'Refresh'),
+                  )),
             ),
           ),
           React.createElement('hr', null),
@@ -1147,12 +1108,12 @@ const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
               healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null),
               healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
               healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),
-              healthRow('No Unmanaged Files', !hasUnmanagedFiles,  
-  unmanagedFiles.loading  
-    ? 'Scanning...'  
-    : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,  
-  hasUnmanagedFiles ? showUnmanagedDialog : null  
-),
+              healthRow('No Unmanaged Files', !hasUnmanagedFiles,
+                unmanagedFiles.loading
+                  ? 'Scanning...'
+                  : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
+                hasUnmanagedFiles ? showUnmanagedDialog : null
+              ),
               healthRow('Suppressed Notifications',
                 suppressedCount === 0,
                 suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
