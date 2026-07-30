@@ -86,6 +86,30 @@ function getIniPaths(gameId) {
   return subPaths.map(p => path.join(docsPath, 'My Games', p));
 }
 
+function getCollectionStats(collectionMod, mods, profile) {  
+  const rules = collectionMod.rules ?? [];  
+  const stats = { enabled: 0, disabled: 0, notInstalled: 0, ignored: 0 };  
+  
+  rules  
+    .filter(r => ['requires', 'recommends'].includes(r.type))  
+    .forEach(rule => {  
+      if (rule.ignored === true) {  
+        stats.ignored++;  
+        return;  
+      }  
+      const referencedMod = util.findModByRef(rule.reference, mods);  
+      if (referencedMod === undefined) {  
+        stats.notInstalled++;  
+        return;  
+      }  
+      const isEnabled = profile?.modState?.[referencedMod.id]?.enabled === true;  
+      isEnabled ? stats.enabled++ : stats.disabled++;  
+    })  
+  
+
+  return stats;  
+}
+
 function row(label, value) {
   return React.createElement('div', { style: { marginBottom: '10px' } },
     React.createElement('strong', null, label),
@@ -409,17 +433,14 @@ function getSteamPath() {
   async function checkAEOwnership() {  
     try {  
       const steamPath = getSteamPath(); // your existing helper  
-      console.log('====steam path: ',steamPath)
       if (!steamPath) {  
         setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' })); 
-        console.log('=====no steam path: ', healthAsync.aeDLCOwned) 
         return;  
       }  
   
       // Check all userdata/<SteamID> directories  
       const userDataPath = path.join(steamPath, 'userdata');  
       let owned = false;  
-      console.log('====owned: ', owned)
       try {  
         const userIds = await fs.readdirAsync(userDataPath);  
         for (const userId of userIds) {  
@@ -435,13 +456,10 @@ function getSteamPath() {
             }  
           } catch {  
             // this userdata entry has no localconfig.vdf, skip 
-            console.log('====nolocalconfig.vdg') 
           }  
         }  
       } catch {  
-        console.log('====userdata dir unreadable')
       }  
-      console.log('====check 1: ', owned);
       if (!owned) {  
         // Fallback: appinfo_log.previous.txt (whole-file search, already was)  
         try {  
@@ -451,11 +469,10 @@ function getSteamPath() {
             owned = true;  
           }  
         } catch (err) {  
-          console.log('====log file not found  ')
-          console.log('====ownership error: ', err?.message ?? err);
+          
         }  
       }  
-      console.log('====check2: ', owned);
+      
       // Change 3: no 'not_owned' — only true or 'unknown'  
       setHealthAsync(p => ({  
         ...p,  
@@ -463,11 +480,9 @@ function getSteamPath() {
       }));  
     } catch (err) {  
       setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));  
-      console.log('====ownership: ',healthAsync.aeDLCOwned)
-      console.log('====ownership error: ', err?.message ?? err);
+      
     }  
   }  
-  console.log('====final: ', healthAsync.aeDLCOwned);
   checkAEOwnership();  
 }, []);
 
@@ -890,7 +905,6 @@ useEffect(() => {
   const dataPath = path.join(gamePath, 'Data');
 
   useEffect(() => {
-    //// console.log('====scan triggered, gamePath:', gamePath, 'activeGameId:', activeGameId);
     if (!gamePath || gamePath === 'Not discovered') return;
     setRawUnmanaged(prev => ({ ...prev, loading: true }));
     function walkUnmanaged(dirPath, maxDepth) {
@@ -1083,7 +1097,6 @@ const [pluginHeaders, setPluginHeaders] = React.useState({});
 
 const isLight = (id) => {  
   if (pluginInfo[id]?.isLight) {
-    // console.log('====isLight from pluginInfo!')
     return true};  
   const filePath = pluginList[id]?.filePath || '';  
   if (filePath.toLowerCase().endsWith('.esl')) return true;  
@@ -1439,11 +1452,18 @@ useEffect(() => {
                 React.createElement('strong', null, `Installed Collections (${collectionCount}):`),
                 collectionCount > 0
                   ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                    ...installedCollections.map(mod =>
-                      React.createElement('li', { key: mod.id },
+                    ...installedCollections.map(mod => {
+                      const stats = getCollectionStats(mod, mods, profile);
+                      const tooltipText =
+                        `Enabled: ${stats.enabled}\n` +
+                        `Disabled: ${stats.disabled}\n` +
+                        `Not Installed: ${stats.notInstalled}\n` +
+                        `Ignored: ${stats.ignored}`;
+
+                      return React.createElement('li', { key: mod.id, title: tooltipText },
                         util.renderModName(mod) || mod.id
-                      )
-                    )
+                      );
+                    })
                   )
                   : React.createElement('span', null, ' None')
               ),
