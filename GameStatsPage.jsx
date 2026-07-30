@@ -429,6 +429,10 @@ const aeDLCInstalled =
   checkAEOwnership();  
 }, []);
 
+const creationsExpected = healthAsync.aeDLCOwned ? 80 : 10;
+
+
+
   const totalModsInstalled = Object.values(mods).filter(
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
@@ -1037,7 +1041,7 @@ const [pluginHeaders, setPluginHeaders] = React.useState({});
 
 const isLight = (id) => {  
   if (pluginInfo[id]?.isLight) {
-    console.log('isLight from pluginInfo!')
+    // console.log('====isLight from pluginInfo!')
     return true};  
   const filePath = pluginList[id]?.filePath || '';  
   if (filePath.toLowerCase().endsWith('.esl')) return true;  
@@ -1426,7 +1430,7 @@ useEffect(() => {
                 () => api.events.emit("show-main-page", "gamebryo-plugins")),
               healthRow('INI Files Present', gameLaunched, healthAsync.iniPresent === null),
               healthRow('OneDrive NOT in INI Path', !hasOneDrive, false),
-              healthRow(`AE DLC OK: ${nativeCount}/80`, healthAsync.aeDLCOwned && aeDLCInstalled === true, aeDLCInstalled === null
+              healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned && nativeCount === 80) || (!healthAsync.aeDLCOwned === 10), aeDLCInstalled === null
                 ? 'Checking...'
                 : null),
               healthRow('Not a removable drive', !isRemovable, null),
