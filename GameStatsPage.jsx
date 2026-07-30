@@ -369,19 +369,57 @@ const aeDLCInstalled =
   nativeCount > 10   ? 'partial' :  
   null; // pluginList not loaded yet
 
+function getSteamPath() {  
+  if (process.platform === 'win32') {  
+    try {  
+      const winapi = require('winapi-bindings');  
+      const result = winapi.RegGetValue(  
+        'HKEY_CURRENT_USER',  
+        'Software\\Valve\\Steam',  
+        'SteamPath'  
+      );  
+      return result.value;  
+    } catch (err) {  
+      return undefined;  
+    }  
+  } else {  
+    // Linux/Wine host paths  
+    const os = require('os');  
+    const path = require('path');  
+    const fs = require('fs');  
+    const home = os.homedir();  
+    const candidates = [  
+      path.join(home, '.local', 'share', 'Steam'),  
+      path.join(home, '.steam', 'debian-installation'),  
+      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),  
+      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),  
+      path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam'),  
+      path.join(home, '.steam', 'steam'),  
+    ];  
+    for (const candidate of candidates) {  
+      if (fs.existsSync(path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
+        return candidate;  
+      }  
+    }  
+    return undefined;  
+  }  
+}
+
   useEffect(() => {  
   async function checkAEOwnership() {  
     try {  
       const steamPath = getSteamPath(); // your existing helper  
+      console.log('====steam path: ',steamPath)
       if (!steamPath) {  
-        setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));  
+        setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' })); 
+        console.log('=====no steam path: ', healthAsync.aeDLCOwned) 
         return;  
       }  
   
       // Check all userdata/<SteamID> directories  
       const userDataPath = path.join(steamPath, 'userdata');  
       let owned = false;  
-  
+      console.log('====owned: ', owned)
       try {  
         const userIds = await fs.readdirAsync(userDataPath);  
         for (const userId of userIds) {  
@@ -396,13 +434,14 @@ const aeDLCInstalled =
               break;  
             }  
           } catch {  
-            // this userdata entry has no localconfig.vdf, skip  
+            // this userdata entry has no localconfig.vdf, skip 
+            console.log('====nolocalconfig.vdg') 
           }  
         }  
       } catch {  
-        // userdata dir unreadable  
+        console.log('====userdata dir unreadable')
       }  
-  
+      console.log('====check 1: ', owned);
       if (!owned) {  
         // Fallback: appinfo_log.previous.txt (whole-file search, already was)  
         try {  
@@ -411,25 +450,28 @@ const aeDLCInstalled =
           if (logData.includes('1746860=')) {  
             owned = true;  
           }  
-        } catch {  
-          // log file not found  
+        } catch (err) {  
+          console.log('====log file not found  ')
+          console.log('====ownership error: ', err?.message ?? err);
         }  
       }  
-  
+      console.log('====check2: ', owned);
       // Change 3: no 'not_owned' — only true or 'unknown'  
       setHealthAsync(p => ({  
         ...p,  
         aeDLCOwned: owned ? true : 'unknown',  
       }));  
-    } catch {  
+    } catch (err) {  
       setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));  
+      console.log('====ownership: ',healthAsync.aeDLCOwned)
+      console.log('====ownership error: ', err?.message ?? err);
     }  
   }  
-  
+  console.log('====final: ', healthAsync.aeDLCOwned);
   checkAEOwnership();  
 }, []);
 
-const creationsExpected = healthAsync.aeDLCOwned ? 80 : 10;
+const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
 
 
 
@@ -1241,7 +1283,7 @@ useEffect(() => {
 
             // Column 1: Path/folder data  
             React.createElement('div', { style: { flex: '1' } },
-              row('Active Game: ', healthAsync.aeDLCOwned ? `${gameName} (with AE DLC)` : gameName),
+              row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : gameName),
               row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
@@ -1430,7 +1472,7 @@ useEffect(() => {
                 () => api.events.emit("show-main-page", "gamebryo-plugins")),
               healthRow('INI Files Present', gameLaunched, healthAsync.iniPresent === null),
               healthRow('OneDrive NOT in INI Path', !hasOneDrive, false),
-              healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned && nativeCount === 80) || (!healthAsync.aeDLCOwned === 10), aeDLCInstalled === null
+              healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10), aeDLCInstalled === null
                 ? 'Checking...'
                 : null),
               healthRow('Not a removable drive', !isRemovable, null),
