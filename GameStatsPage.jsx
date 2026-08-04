@@ -36,12 +36,12 @@ const filesToSkip = new Set([
   'user.json',
 ]);
 
-const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
-const FLAG_LIGHT = 0x00000200; 
+// const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
+// const FLAG_LIGHT = 0x00000200; 
 
-function readPluginLightFlag(filePath) {
+function readPluginHeader(filePath) {
   
-  return new Promise((resolve) => {
+  return new Promise((resolve) => {  
     const buf = Buffer.alloc(12);
     const fd = require('fs').open(filePath, 'r', (err, fd) => {
       if (err) return resolve(false);
@@ -52,9 +52,9 @@ function readPluginLightFlag(filePath) {
         if (buf.toString('ascii', 0, 4) !== 'TES4') return resolve(false);
         const flags = buf.readUInt32LE(8);
         resolve((flags & 0x200) !== 0); // FLAG_LIGHT  
-      });
-    });
-  });
+      });  
+    });  
+  });  
 }
 
 // MDI icon paths (hardcoded to avoid ES module import issues)  
@@ -407,7 +407,7 @@ function getSteamPath() {
       return undefined;  
     }  
   } else {  
-    // Linux/Wine host paths  
+    // Linux host paths  
     const os = require('os');  
     const path = require('path');  
     const fs = require('fs');  
@@ -687,11 +687,34 @@ useEffect(() => {
           d.mountpoints && d.mountpoints.some(mp => mp.path === volume)
         );
 
-        setIsRemovable(disk?.isRemovable === true);
-      } catch (err) {
+      if (!disk) {
         setIsRemovable(false);
+        return;
       }
-    };
+
+      // drivelist device is usually \\.\PHYSICALDRIVE#
+      const diskNumber = disk.device.match(/PHYSICALDRIVE(\d+)/i)?.[1];
+
+      if (diskNumber === undefined) {
+        setIsRemovable(false);
+        return;
+      }
+
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      // Better as long as the user has PowerShell available (Windows 7+). For Wine we need a better solution.
+      const { stdout } = await execAsync(
+        `powershell -NoProfile -Command "Get-Disk -Number ${diskNumber} | Select-Object -ExpandProperty BusType"`
+      );
+
+      setIsRemovable(stdout.trim() === 'USB');
+
+    } catch (err) {
+      setIsRemovable(false);
+    }
+  };
+
 
     checkRemovable();
   }, [gameDiscovery?.path]);
@@ -828,7 +851,7 @@ useEffect(() => {
     };
 
     checkIniFiles();
-  }, [activeGameId]);
+  }, [activeGameId, refreshKey]);
 
   // Deployment  
   const isDeployed = !needToDeploy;
@@ -852,7 +875,7 @@ useEffect(() => {
     skyrim: 'skse', skyrimse: 'skse64', skyrimvr: 'sksevr',
     fallout4: 'f4se', fallout4vr: 'F4SEVR', falloutnv: 'nvse',
   };
-  const expectedXseId = xseToolIdMap[activeGameId?.toLowerCase()];
+  const expectedXseId = xseToolIdMap[activeGameId];
   const isXsePrimary = expectedXseId
     ? primaryToolId === expectedXseId
     : primaryToolId !== null;
@@ -1072,7 +1095,7 @@ useEffect(() => {
   //Get plugin details for the current game
 
   const eslGames = ['skyrimse', 'skyrimvr', 'fallout4', 'fallout4vr', 'starfield'];
-  const eslGame = eslGames.includes(activeGameId?.toLowerCase());
+  const eslGame = eslGames.includes(activeGameId);
 
   const isActive = (id) =>
     loadOrder[id]?.enabled === true || pluginList[id]?.isNative === true;
@@ -1080,51 +1103,54 @@ useEffect(() => {
   // A plugin is disabled if it exists on disk, is not native, and is not active  
   const disabledPlugins = React.useMemo(() => Object.keys(pluginList).filter(
     (id) => !pluginList[id]?.isNative && !isActive(id)
-  ), [pluginList, loadOrder]);
+  ), [pluginList, loadOrder, refreshKey]);
 
   const isValid = (id) =>
     (pluginList[id]?.deployed === true || pluginList[id]?.isNative === true) && isActive(id);
 
- /*onst isLight = (id) => {
-    if (pluginInfo[id]?.isLight) return true;
+  const [pluginHeaders, setPluginHeaders] = React.useState({});
+
+  const isLight = (id) => {
+    if (pluginHeaders[id]?.isLight === true) {
+      return true
+    };
     const filePath = pluginList[id]?.filePath || '';
-    return filePath.toLowerCase().endsWith('.esl');
+    if (filePath.toLowerCase().endsWith('.esl')) return true;
+    return false;
   };
-*/
+
+  useEffect(() => {
+    if (!gamePath || gamePath === 'Not discovered') return;
+    const dataPath = path.join(gamePath, 'Data');
+    const ids = Object.keys(pluginList).filter(id =>
+      pluginList[id]?.deployed || pluginList[id]?.isNative
+    );
+    Promise.all(
+      ids.map(id => {
+        const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
+        return readPluginHeader(filePath)
+          .then(info  => [id, info])
+          .catch(() => [id, {isLight: false, masterList: [] }]);
+      })
+    ).then(results => {
+      setPluginHeaders(Object.fromEntries(results));
+    });
+  }, [gamePath, activeGameId, refreshKey]);
 
 
-const [pluginHeaders, setPluginHeaders] = React.useState({});  
-
-const isLight = (id) => {  
-  if (pluginInfo[id]?.isLight) {
-    return true};  
-  const filePath = pluginList[id]?.filePath || '';  
-  if (filePath.toLowerCase().endsWith('.esl')) return true;  
-  return pluginHeaders[id] === true;  
-};
-
-useEffect(() => {  
-  if (!gamePath || gamePath === 'Not discovered') return;  
-  const dataPath = path.join(gamePath, 'Data');  
-  const ids = Object.keys(pluginList).filter(id =>  
-    pluginList[id]?.deployed || pluginList[id]?.isNative  
-  );  
-  Promise.all(  
-    ids.map(id => {  
-      const filePath = pluginList[id]?.filePath || path.join(dataPath, id);  
-      return readPluginLightFlag(filePath)  
-        .then(isLight => [id, isLight])  
-        .catch(() => [id, false]);  
-    })  
-  ).then(results => {  
-    setPluginHeaders(Object.fromEntries(results));  
-  });  
-}, [gamePath, activeGameId]);
-
-
-  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder]);
-  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders]);
-  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders]);
+  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder, refreshKey]);
+  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders, refreshKey]);
+  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders, refreshKey]);
+  const missingMasters = React.useMemo(() => {  
+    const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));  
+    const result = {};  
+    activePlugins.forEach(id => {  
+      const masters = pluginHeaders[id]?.masterList ?? [];  
+      const missing = masters.filter(m => !activeSet.has(m.toLowerCase()));  
+      if (missing.length > 0) result[id] = missing;  
+    });  
+    return result;  
+  }, [activePlugins, pluginHeaders, refreshKey]);
 
   const regularLimit = eslGame ? 254 : 255;
   const lightLimit = 4096;
@@ -1224,7 +1250,8 @@ useEffect(() => {
       React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         React.createElement('button', {  
   onClick: openScreenshotTool,  
-  className: 'btn btn-default btn-s',  
+  className: 'btn btn-default btn-s',
+  title: '⊞Win + Shift + S',  
 }, 'Take Screenshot'),
         React.createElement('button', {
           className: 'btn btn-default',
@@ -1296,7 +1323,7 @@ useEffect(() => {
 
             // Column 1: Path/folder data  
             React.createElement('div', { style: { flex: '1' } },
-              row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : gameName),
+              row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : `${gameName} (No AE DLC)`),
               row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
@@ -1409,7 +1436,8 @@ useEffect(() => {
 
             //Column 2
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
-              row('Total Active Plugins: ', activePlugins.length),
+              // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
+              row('Total Active Plugins: ', `${activePlugins.length} `),
               row('Disabled Plugins: ', disabledPlugins.length),
               row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
               row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),
