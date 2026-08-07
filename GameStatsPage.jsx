@@ -394,7 +394,13 @@ const aeDLCInstalled =
   null; // pluginList not loaded yet
 
 function getSteamPath() {  
-  if (process.platform === 'win32') {  
+  if (process.env.WINEPREFIX || process.env.WINELOADER) {
+    // Wine host 
+    const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
+    const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
+    return wineResult;
+  } else if ((!process.env.WINEPREFIX || process.env.WINELOADER) && process.platform === 'win32') {  
+    // Windows host
     try {  
       const winapi = require('winapi-bindings');  
       const result = winapi.RegGetValue(  
@@ -421,13 +427,13 @@ function getSteamPath() {
       path.join(home, '.steam', 'steam'),  
     ];  
     for (const candidate of candidates) {  
-      if (fs.existsSync(path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
+      if (fs.existsSync)// (path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
         return candidate;  
       }  
     }  
     return undefined;  
   }  
-}
+
 
   useEffect(() => {  
   async function checkAEOwnership() {  
@@ -438,15 +444,19 @@ function getSteamPath() {
         return;  
       }  
   
-      // Check all userdata/<SteamID> directories  
-      const userDataPath = path.join(steamPath, 'userdata');  
+      // Check  userdata/<SteamID> directory
+      
+      const userDataPath = path.join(steamPath, 'userdata');
+        
+      console.log('====Checking userdata path:', userDataPath);
       let owned = false;  
       try {  
         const userIds = await fs.readdirAsync(userDataPath);  
         for (const userId of userIds) {  
           const localConfigPath = path.join(  
             userDataPath, userId, 'config', 'localconfig.vdf'  
-          );  
+          ); 
+          console.log('====Checking localconfig.vdf for userId:', userId, 'path:', localConfigPath); 
           try {  
             // Change 4: search whole file, not just AppTickets section  
             const data = await fs.readFileAsync(localConfigPath, 'utf8');  
@@ -519,20 +529,28 @@ const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
     setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));
 
     // GPU
-    if (process.env.WINEPREFIX) {
-      // Try reading GPU from Linux sysfs  
-      exec('vulkaninfo --summary |grep deviceName || echo Unknown',
-        { timeout: 3000 },
-        (err, stdout) => {
-          setHardwareInfo(prev => ({
-            ...prev,
-            gpu: (!err && stdout.trim() && stdout.trim() !== 'Unknown')
-              ? stdout.trim()
-              : 'Unknown (Wine)'
-          }));
-        }
-      );
-    } else {
+    if (process.platform === 'win32') {  
+  // Will work for Wine or Windows  
+  exec(`wmic path Win32_VideoController get Name || echo Unknown`,  
+    { timeout: 3000, encoding: 'buffer' },  
+    (err, stdoutBuf) => {  
+      const stdout = stdoutBuf.toString('utf16le'); // wmic outputs UTF-16LE  
+      console.log('===GPU detection:', err, stdout);  
+  
+      const lines = stdout  
+        .split(/\r?\n/)  
+        .map(l => l.trim())  
+        .filter(l => l.length > 0 && l.toLowerCase() !== 'name');  
+  
+      setHardwareInfo(prev => ({  
+        ...prev,  
+        gpu: (!err && lines.length > 0)  
+          ? lines.join(', ')  
+          : 'Unknown (Wine)'  
+      }));  
+    }  
+  );  
+} else {
       // GPU — async via PowerShell/exec  
       exec(
         'powershell -NoProfile -NonInteractive -Command "'
