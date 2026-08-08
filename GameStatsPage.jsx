@@ -392,7 +392,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.4.2 - WiP";
+  const extensionVersion = "1.5.0";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -1548,10 +1548,7 @@ useEffect(() => {
                       React.createElement('li', null, `${unmanagedFiles.meshes.length} meshes, ` +
                         `${unmanagedFiles.animations.length} animations`
                       ),),
-                    React.createElement('button', {
-                      onClick: () => setRefreshKey(k => k + 1),
-                      className: 'btn btn-default btn-xs', style: { marginRight: '6px' }
-                    }, 'Refresh'),
+                    
                   )),
             ),
           ),
@@ -1605,6 +1602,10 @@ useEffect(() => {
           }
         },
           React.createElement('h3', { style: { marginTop: 0, marginBottom: '12px' } }, 'Health Checks'),
+          React.createElement('button', {
+                      onClick: () => setRefreshKey(k => k + 1),
+                      className: 'btn btn-default btn-xs', style: { marginRight: '6px' }
+                    }, 'Refresh'),
           React.createElement('div', {
             style: { display: 'flex', gap: '32px', justifyContent: 'center' }
           },

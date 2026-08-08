@@ -61,7 +61,7 @@ function init(context) {
   util.installIconSet('game-stats', path.join(__dirname, 'icon.svg'));  
 });
 
-  context.registerMainPage('helmet', 'Immersive Support - 1.4.1 WIP', GameStatsPage, {  
+  context.registerMainPage('helmet', 'Immersive Support', GameStatsPage, {  
     priority: 25,  
     hotkey: 'I',  
     group: 'per-game',
