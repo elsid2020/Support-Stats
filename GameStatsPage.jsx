@@ -515,7 +515,6 @@ function getSteamPath() {
       
       const userDataPath = path.join(steamPath, 'userdata');
         
-      console.log('====Checking userdata path:', userDataPath);
       let owned = false;  
       try {  
         const userIds = await fs.readdirAsync(userDataPath);  
@@ -523,7 +522,6 @@ function getSteamPath() {
           const localConfigPath = path.join(  
             userDataPath, userId, 'config', 'localconfig.vdf'  
           ); 
-          console.log('====Checking localconfig.vdf for userId:', userId, 'path:', localConfigPath); 
           try {  
             // Change 4: search whole file, not just AppTickets section  
             const data = await fs.readFileAsync(localConfigPath, 'utf8');  
@@ -901,15 +899,12 @@ useEffect(() => {
         })
       );
 
-      // ✅ FIX: Convert array of booleans to an object { "path": true, "path2": false }
       const statusMap = iniPaths.reduce((acc, path, index) => {
         acc[path] = results[index];
         return acc;
       }, {});
 
-      console.log('==== INI file check results:', statusMap);
 
-      // ✅ FIX: Use consistent key name 'iniPresent' (lowercase) to match your render code
       setHealthAsync((p) => ({ 
         ...p, 
         iniPresent: statusMap 
@@ -1203,7 +1198,6 @@ useEffect(() => {
 
   const isLight = (id) => {
   if (pluginInfo[id]?.isLight) {
-    console.log('isLight from pluginInfo!')
     return true};  
     const filePath = pluginList[id]?.filePath || '';
     if (filePath.toLowerCase().endsWith('.esl')) return true;
