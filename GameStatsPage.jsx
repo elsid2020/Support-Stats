@@ -424,6 +424,21 @@ function GameStatsPage({ api }) {
     return selectors.installPathForGame(state, gameId);
   });
 
+  const knownActivators = {
+    'symlink_activator': 'Symlinks',
+    'hardlink_activator': 'Hardlinks',
+    'move_activator': 'Move Files',
+  };
+
+  const activatorId = useSelector((state) => {
+    const gameId = selectors.activeGameId(state);
+    return state?.settings?.mods?.activator[gameId] || 'unknown';
+  });
+
+  const deploymentMethodLabel = activatorId  
+  ? (knownActivators[activatorId] ?? activatorId)   // fallback to raw id if unmapped  
+  : 'Unknown';
+
 const [healthAsync, setHealthAsync] = useState({  
   updateAvailable: null,  
   updateVersion: null,  
@@ -1102,6 +1117,7 @@ useEffect(() => {
     'test-oblivion-fonts': 'Missing Oblivion fonts',
     'test-skyrim-fonts': 'Missing Skyrim fonts',
     'game-stats-welcome': 'Welcome dialog',
+
   };
 
   // Cross-reference with active notifications for severity (best-effort — dismissed ones show 'unknown')  
@@ -1486,7 +1502,7 @@ useEffect(() => {
                   ? `${driveInfo.system.root} — ${driveInfo.system.freeGB.toFixed(1)} GB free of ${driveInfo.system.totalGB.toFixed(1)} GB`
                   : 'Unknown'
                 ),
-                React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used: '),
+                React.createElement('span', { style: { fontWeight: 'bold' } }, `Space Used (${deploymentMethodLabel}): `),
                 React.createElement('span', null, spaceUsedStr)
               ),
               React.createElement('div', null,
