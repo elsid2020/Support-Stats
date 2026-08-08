@@ -68,7 +68,7 @@ async function getGpuInfo(subkey) {
   if (!nameMatch) return null;  
   
   const name = nameMatch[1].trim();  
-  const isKnownVendor = /intel|amd|nvidia/i.test(name);  
+  const isKnownVendor = /intel|amd|nvidia|radeon/i.test(name);  
   if (!isKnownVendor) return null;  
   
   const vramGB = memMatch  
@@ -92,8 +92,7 @@ function formatGpuList(list) {
 }
 
 
-function readPluginHeader(filePath) {
-  
+function readPluginLightFlag(filePath) {
   return new Promise((resolve) => {  
     const buf = Buffer.alloc(12);
     const fd = require('fs').open(filePath, 'r', (err, fd) => {
@@ -428,7 +427,7 @@ function GameStatsPage({ api }) {
 const [healthAsync, setHealthAsync] = useState({  
   updateAvailable: null,  
   updateVersion: null,  
-  iniPresent: null,  
+  iniPresent: false,  
   suppressedMap: null,  
   aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data  
 });  
@@ -872,9 +871,46 @@ useEffect(() => {
       setHealthAsync(p => ({ ...p, updateAvailable: false, updateVersion: null }));  
     });  
 }, []);
-  
+ 
+useEffect(() => {
+  const checkIniFiles = async () => {
+    try {
+      const results = await Promise.all(
+        iniPaths.map(async (p) => {
+          try {
+            const stats = await fs.statAsync(p);
+            return stats.size > 0;
+          } catch {
+            return false;
+          }
+        })
+      );
 
-  useEffect(() => {
+      // ✅ FIX: Convert array of booleans to an object { "path": true, "path2": false }
+      const statusMap = iniPaths.reduce((acc, path, index) => {
+        acc[path] = results[index];
+        return acc;
+      }, {});
+
+      console.log('==== INI file check results:', statusMap);
+
+      // ✅ FIX: Use consistent key name 'iniPresent' (lowercase) to match your render code
+      setHealthAsync((p) => ({ 
+        ...p, 
+        iniPresent: statusMap 
+      }));
+      
+    } catch (error) {
+      console.error("Error checking INI files:", error);
+      // Ensure state is never null in case of error
+      setHealthAsync((p) => ({ ...p, iniPresent: {} }));
+    }
+  };
+
+  checkIniFiles();
+}, [activeGameId, refreshKey]);
+
+/*  useEffect(() => {
     // --- INI files present ---  
     const checkIniFiles = async () => {
       const results = await Promise.all(
@@ -884,12 +920,13 @@ useEffect(() => {
             .catch(() => false)
         )
       );
+      console.log('====INI file check results:', results);
       const iniOk = iniPaths.length > 0 && results.every(r => r === true);
-      setHealthAsync((p) => ({ ...p, iniPresent: iniOk }));
+      setHealthAsync((p) => ({ ...p, iniPresent: results }));
     };
 
     checkIniFiles();
-  }, [activeGameId, refreshKey]);
+  }, [activeGameId, refreshKey]); */
 
   // Deployment  
   const isDeployed = !needToDeploy;
@@ -898,8 +935,8 @@ useEffect(() => {
     state?.persistent?.immersiveSupport?.pluginsSorted === true
   );
 
-  // Game launched (INI + shader cache)  
-  const gameLaunched = healthAsync.iniPresent === true; // && healthAsync.shaderCachePresent === true;  
+  // Game launched  
+  const gameLaunched = iniPaths.every((p) => healthAsync.iniPresent[p] === true);
 
   // OneDrive in INI path  
   const hasOneDrive = iniPaths.some((p) => p.toLowerCase().includes('onedrive'));
@@ -1149,12 +1186,12 @@ useEffect(() => {
   const [pluginHeaders, setPluginHeaders] = React.useState({});
 
   const isLight = (id) => {
-    if (pluginHeaders[id]?.isLight === true) {
-      return true
-    };
+  if (pluginInfo[id]?.isLight) {
+    console.log('isLight from pluginInfo!')
+    return true};  
     const filePath = pluginList[id]?.filePath || '';
     if (filePath.toLowerCase().endsWith('.esl')) return true;
-    return false;
+  return pluginHeaders[id] === true;  
   };
 
   useEffect(() => {
@@ -1166,9 +1203,9 @@ useEffect(() => {
     Promise.all(
       ids.map(id => {
         const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
-        return readPluginHeader(filePath)
-          .then(info  => [id, info])
-          .catch(() => [id, {isLight: false, masterList: [] }]);
+        return readPluginLightFlag(filePath)
+        .then(isLight => [id, isLight])  
+        .catch(() => [id, false]);  
       })
     ).then(results => {
       setPluginHeaders(Object.fromEntries(results));
@@ -1326,7 +1363,7 @@ useEffect(() => {
           }
         },
           React.createElement('h2', null, 'Support Stats - Immersive Support'),
-          row(extensionVersion),
+          row('v' + extensionVersion),
           row('Vortex Version: ', vortexVersion),
           React.createElement('div', {
             style: {
@@ -1371,9 +1408,11 @@ useEffect(() => {
                 React.createElement('strong', null, 'INI Files:'),
                 iniPaths.length > 0
                   ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                    ...iniPaths.map(p => React.createElement('li', { key: p }, p))
+                    ...iniPaths
+                    .filter(p => healthAsync.iniPresent[p])
+                    .map(p => React.createElement('li', { key: p }, p))
                   )
-                  : React.createElement('span', null, ' Not available for this game'),
+                  : React.createElement('span', null, ' Not available'),
                 React.createElement('div', null,
                   // React.createElement('strong', null, 'Discovered Tools'),
                   expectedXseId !== undefined
