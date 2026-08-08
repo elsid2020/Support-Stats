@@ -39,6 +39,59 @@ const filesToSkip = new Set([
 // const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
 // const FLAG_LIGHT = 0x00000200; 
 
+// Helper function for grabbing gpu info on Windows and Linux (Wine)
+const GPU_CLASS_KEY = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}';  
+  
+function execReg(cmd) {  
+  return new Promise((resolve) => {  
+    exec(cmd, { windowsHide: true }, (err, stdout) => {  
+      if (err) return resolve(''); 
+      resolve(stdout || '');  
+    });  
+  });  
+}  
+  
+// Step 1: list the numbered subkeys (0000, 0001, ...) under the GPU class key  
+async function getGpuSubkeys() {  
+  const output = await execReg(`reg query "${GPU_CLASS_KEY}"`);  
+  const lines = output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);  
+  return lines  
+    .map((line) => line.split('\\').pop())  
+    .filter((sub) => /^\d{4}$/.test(sub));  
+}  
+  
+// Step 2: read DriverDesc + qwMemorySize for one subkey  
+async function getGpuInfo(subkey) { 
+  const output = await execReg(`reg query "${GPU_CLASS_KEY}\\${subkey}"`);  
+  const nameMatch = output.match(/DriverDesc\s+REG_\w+\s+(.+)/i);  
+  const memMatch = output.match(/HardwareInformation\.qwMemorySize\s+REG_QWORD\s+0x([0-9a-fA-F]+)/i);  
+  if (!nameMatch) return null;  
+  
+  const name = nameMatch[1].trim();  
+  const isKnownVendor = /intel|amd|nvidia/i.test(name);  
+  if (!isKnownVendor) return null;  
+  
+  const vramGB = memMatch  
+    ? Math.round((parseInt(memMatch[1], 16) / (1024 ** 3)) * 100) / 100  
+    : null;  
+  return { name, vramGB };  
+}  
+  
+// Step 3: gather every GPU found under the class key  
+async function getGpuList() {  
+  const subkeys = await getGpuSubkeys(); 
+  const results = await Promise.all(subkeys.map(getGpuInfo));  
+  return results.filter(Boolean);  
+}  
+  
+function formatGpuList(list) {  
+  if (list.length === 0) return 'GPU: Unknown';  
+  return list  
+    .map((g) => ` ${g.name} | ${g.vramGB != null ? g.vramGB + 'GB' : '—'}`)  
+    .join('\n');  
+}
+
+
 function readPluginHeader(filePath) {
   
   return new Promise((resolve) => {  
@@ -531,50 +584,17 @@ const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
     // GPU
     if (process.platform === 'win32') {  
   // Will work for Wine or Windows  
-  exec(`wmic path Win32_VideoController get Name || echo Unknown`,  
-    { timeout: 3000, encoding: 'buffer' },  
-    (err, stdoutBuf) => {  
-      const stdout = stdoutBuf.toString('utf16le'); // wmic outputs UTF-16LE  
-      console.log('===GPU detection:', err, stdout);  
+    let cancelled = false;  
   
-      const lines = stdout  
-        .split(/\r?\n/)  
-        .map(l => l.trim())  
-        .filter(l => l.length > 0 && l.toLowerCase() !== 'name');  
+  getGpuList().then((list) => {  
+    if (cancelled) return;  
+    setHealthAsync((p) => ({ ...p, gpu: list }));  
+  });  
+}
+  return () => { cancelled = true; };  
+    
+}, []);
   
-      setHardwareInfo(prev => ({  
-        ...prev,  
-        gpu: (!err && lines.length > 0)  
-          ? lines.join(', ')  
-          : 'Unknown (Wine)'  
-      }));  
-    }  
-  );  
-} else {
-      // GPU — async via PowerShell/exec  
-      exec(
-        'powershell -NoProfile -NonInteractive -Command "'
-        + '$gpu = (Get-WmiObject Win32_VideoController | Select-Object -First 1).Name; '
-        + '$regBase = \'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\'; '
-        + '$vram = 0; '
-        + 'Get-ChildItem $regBase -ErrorAction SilentlyContinue | ForEach-Object { '
-        + '  $desc = (Get-ItemProperty $_.PSPath -Name DriverDesc -ErrorAction SilentlyContinue).DriverDesc; '
-        + '  if ($desc -and $gpu -and ($desc -like (\'*\' + $gpu + \'*\') -or $gpu -like (\'*\' + $desc + \'*\'))) { '
-        + '    $v = (Get-ItemProperty $_.PSPath -Name \'HardwareInformation.qwMemorySize\' -ErrorAction SilentlyContinue).\'HardwareInformation.qwMemorySize\'; '
-        + '    if ($v) { $vram = $v } '
-        + '  } '
-        + '}; '
-        + 'Write-Output ($gpu + \' | \' + [math]::Round($vram / 1GB, 0) + \' GB\')"',
-        (err, stdout) => {
-          if (err || !stdout.trim()) {
-            setHardwareInfo(prev => ({ ...prev, gpu: 'Unknown' }));
-            return;
-          }
-          setHardwareInfo(prev => ({ ...prev, gpu: stdout.trim() }));
-        }
-      );
-    }
-  }, []);
 
   function getOSFlavor() {  
   return new Promise((resolve) => {  
@@ -1305,7 +1325,8 @@ useEffect(() => {
             position: 'relative',
           }
         },
-          React.createElement('h2', null, 'Immersive Support - Support Stats ', extensionVersion),
+          React.createElement('h2', null, 'Support Stats - Immersive Support'),
+          row(extensionVersion),
           row('Vortex Version: ', vortexVersion),
           React.createElement('div', {
             style: {
@@ -1330,9 +1351,11 @@ useEffect(() => {
               React.createElement('strong', null, 'RAM: '),
               hardwareInfo.ram
             ),
-            React.createElement('div', null,
+
+            React.createElement('div', { style: { display: 'flex' , whiteSpace: 'pre-line' } },
               React.createElement('strong', null, 'GPU: '),
-              hardwareInfo.gpu
+              React.createElement('div', null,
+                formatGpuList(healthAsync.gpu ?? [])),
             ),
           ),
           React.createElement('hr', null),
