@@ -444,7 +444,8 @@ const [healthAsync, setHealthAsync] = useState({
   updateVersion: null,  
   iniPresent: false,  
   suppressedMap: null,  
-  aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data  
+  aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data 
+  aeDLCOwnedManual: false,   // true=checked manually
 });  
 
 const pluginList = useSelector(state =>  
@@ -502,64 +503,91 @@ function getSteamPath() {
   }  
 
 
-  useEffect(() => {  
-  async function checkAEOwnership() {  
-    try {  
-      const steamPath = getSteamPath(); // your existing helper  
-      if (!steamPath) {  
-        setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' })); 
-        return;  
-      }  
-  
-      // Check  userdata/<SteamID> directory
-      
+  // --- file-check effect ---
+useEffect(() => {
+  let cancelled = false;
+
+  function extractBracedSection(text, key) {
+    // depth-aware brace matching instead of a naive regex
+    const keyIdx = text.search(new RegExp(`"${key}"\\s*\\{`, 'i'));
+    if (keyIdx === -1) return null;
+    const openIdx = text.indexOf('{', keyIdx);
+    let depth = 0;
+    for (let i = openIdx; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}') {
+        depth--;
+        if (depth === 0) return text.slice(openIdx + 1, i);
+      }
+    }
+    return null; // unterminated — treat as not found
+  }
+
+  async function readWithTimeout(filePath, ms = 3000) {
+    return Promise.race([
+      fs.readFileAsync(filePath, 'utf8'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+    ]);
+  }
+
+  async function checkAEOwnership() {
+
+    if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwnedManual: false }));
+
+    try {
+      const steamPath = getSteamPath();
+      if (!steamPath) {
+        if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));
+        return;
+      }
       const userDataPath = path.join(steamPath, 'userdata');
-        
-      let owned = false;  
-      try {  
-        const userIds = await fs.readdirAsync(userDataPath);  
-        for (const userId of userIds) {  
-          const localConfigPath = path.join(  
-            userDataPath, userId, 'config', 'localconfig.vdf'  
-          ); 
-          try {  
-            // Change 4: search whole file, not just AppTickets section  
-            const data = await fs.readFileAsync(localConfigPath, 'utf8');  
-            if (data.includes('"1746860"')) {  
-              owned = true;  
-              break;  
-            }  
-          } catch {  
-            // this userdata entry has no localconfig.vdf, skip 
-          }  
-        }  
-      } catch {  
-      }  
-      if (!owned) {  
-        // Fallback: appinfo_log.previous.txt (whole-file search, already was)  
-        try {  
-          const logPath = path.join(steamPath, 'logs', 'appinfo_log.previous.txt');  
-          const logData = await fs.readFileAsync(logPath, 'utf8');  
-          if (logData.includes('1746860=')) {  
-            owned = true;  
-          }  
-        } catch (err) {  
-          
-        }  
-      }  
-      
-      // Change 3: no 'not_owned' — only true or 'unknown'  
-      setHealthAsync(p => ({  
-        ...p,  
-        aeDLCOwned: owned ? true : 'unknown',  
-      }));  
-    } catch (err) {  
-      setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));  
-      
-    }  
-  }  
-  checkAEOwnership();  
-}, []);
+      let owned = false;
+
+      try {
+        const userIds = await fs.readdirAsync(userDataPath);
+        for (const userId of userIds) {
+          const localConfigPath = path.join(userDataPath, userId, 'config', 'localconfig.vdf');
+          try {
+            let data = await readWithTimeout(localConfigPath);
+            if (data.charCodeAt(0) === 0xfeff) data = data.slice(1); // strip BOM
+            const section = extractBracedSection(data, 'apptickets');
+            if (section && /"1746860"/.test(section)) {
+              owned = true;
+              break;
+            }
+          } catch (err) {
+            if (err.code && err.code !== 'ENOENT') {
+              console.warn(`AE ownership check: unexpected error reading ${localConfigPath}`, err);
+            }
+          }
+        }
+      } catch (err) {
+        if (err.code && err.code !== 'ENOENT') {
+          console.warn('AE ownership check: unexpected error listing userdata', err);
+        }
+      }
+
+      if (!owned) {
+        try {
+          const logPath = path.join(steamPath, 'logs', 'appinfo_log.previous.txt');
+          const logData = await readWithTimeout(logPath);
+          if (logData.includes('1746860=')) owned = true;
+        } catch { /* diagnostic fallback unavailable, ignore */ }
+      }
+
+      if (!cancelled) {
+        setHealthAsync(p =>
+          p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: owned ? true : 'unknown' }
+        );
+      }
+    } catch {
+      if (!cancelled) setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: 'unknown' }));
+    }
+  }
+
+  checkAEOwnership();
+  return () => { cancelled = true; };
+}, [refreshKey]); 
 
 const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
 
@@ -1399,7 +1427,7 @@ useEffect(() => {
               hardwareInfo.ram
             ),
 
-            React.createElement('div', { style: { display: 'flex' , whiteSpace: 'pre-line' } },
+            React.createElement('div', { style: { display: 'flex' , whiteSpace: 'pre' } },
               React.createElement('strong', null, 'GPU: '),
               React.createElement('div', null,
                 formatGpuList(healthAsync.gpu ?? [])),
@@ -1411,7 +1439,23 @@ useEffect(() => {
 
             // Column 1: Path/folder data  
             React.createElement('div', { style: { flex: '1' } },
-              row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : `${gameName} (No AE DLC)`),
+              row('Game Path: ', gamePath),
+              React.createElement('label', null,
+  React.createElement('input', {
+    type: 'checkbox',
+    checked: healthAsync.aeDLCOwned === true,
+    onChange: (e) => {
+      const checked = e.target.checked;
+      setHealthAsync(p => ({ ...p, aeDLCOwned: checked ? true : 'unknown', aeDLCOwnedManual: true }));
+    },
+  }),
+  ' AE DLC Owned ',
+  React.createElement('span', {
+    style: { fontSize: '0.8em', color: '#888', marginLeft: '4px' },
+  }, healthAsync.aeDLCOwnedManual ? '(manual)' : '(auto)')
+),
+              
+              // row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : `${gameName} (No AE DLC)`),
               row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
