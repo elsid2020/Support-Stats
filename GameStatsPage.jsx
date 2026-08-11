@@ -1,6 +1,6 @@
 const React = require('react');
 const { useSelector } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log} = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -9,6 +9,7 @@ const { exec, execFile } = require('child_process');
 const { count } = require('console');
 const { json } = require('stream/consumers');
 const semver = require('semver')
+
 const iniFileMap = {
   skyrim: ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],
   skyrimse: ['Skyrim Special Edition/Skyrim.ini', 'Skyrim Special Edition/SkyrimPrefs.ini'],
@@ -22,7 +23,7 @@ const iniFileMap = {
   enderal: ['Enderal/Enderal.ini', 'Enderal/EnderalPrefs.ini'],
   enderalspecialedition: ['Enderal Special Edition/Enderal.ini', 'Enderal Special Edition/EnderalPrefs.ini'],
 };
-
+// const displayPath = fullPath.replace(/\\/g, '/').replace(/(\/Users\/)([^/]+)/i, '$1<USER>');
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
@@ -35,6 +36,10 @@ const filesToSkip = new Set([
   'user.json.vortex_backup',
   'user.json',
 ]);
+
+function displayPath(fullPath) {
+  return fullPath.replace(/\\/g, '/').replace(/(\/(?:Users|home)\/)([^/]+)/i, '$1<USER>');
+}
 
 // const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
 // const FLAG_LIGHT = 0x00000200; 
@@ -392,13 +397,14 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.5.0";
+  const extensionVersion = "1.5.1";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
   const gameName = game ? game.name : 'Unknown';
   const { useEffect, useState, useRef } = React;
-  const iniPaths = getIniPaths(activeGameId);
+  const rawIniPaths = getIniPaths(activeGameId);
+  const displayIniPaths = rawIniPaths.map(displayPath);
   const [refreshKey, setRefreshKey] = React.useState(0);
   
   
@@ -917,7 +923,7 @@ useEffect(() => {
   const checkIniFiles = async () => {
     try {
       const results = await Promise.all(
-        iniPaths.map(async (p) => {
+        rawIniPaths.map(async (p) => {
           try {
             const stats = await fs.statAsync(p);
             return stats.size > 0;
@@ -927,7 +933,7 @@ useEffect(() => {
         })
       );
 
-      const statusMap = iniPaths.reduce((acc, path, index) => {
+      const statusMap = rawIniPaths.reduce((acc, path, index) => {
         acc[path] = results[index];
         return acc;
       }, {});
@@ -974,10 +980,10 @@ useEffect(() => {
   );
 
   // Game launched  
-  const gameLaunched = iniPaths.every((p) => healthAsync.iniPresent[p] === true);
+  const gameLaunched = rawIniPaths.every((p) => healthAsync.iniPresent[p] === true);
 
   // OneDrive in INI path  
-  const hasOneDrive = iniPaths.some((p) => p.toLowerCase().includes('onedrive'));
+  const hasOneDrive = rawIniPaths.some((p) => p.toLowerCase().includes('onedrive'));
 
   // Vortex update pending (non-beta)  
   const updatePending = healthAsync.updateAvailable === true;
@@ -1437,34 +1443,39 @@ useEffect(() => {
 
           React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },
 
-            // Column 1: Path/folder data  
+            // Column 1: Path/folder data
             React.createElement('div', { style: { flex: '1' } },
-              row('Game Path: ', gamePath),
-              React.createElement('label', null,
-  React.createElement('input', {
-    type: 'checkbox',
-    checked: healthAsync.aeDLCOwned === true,
-    onChange: (e) => {
-      const checked = e.target.checked;
-      setHealthAsync(p => ({ ...p, aeDLCOwned: checked ? true : 'unknown', aeDLCOwnedManual: true }));
-    },
-  }),
-  ' AE DLC Owned ',
-  React.createElement('span', {
-    style: { fontSize: '0.8em', color: '#888', marginLeft: '4px' },
-  }, healthAsync.aeDLCOwnedManual ? '(manual)' : '(auto)')
-),
-              
+              React.createElement('div', { style: { marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } },
+                React.createElement('strong', null, 'Active Game: '),
+                gameName,
+                React.createElement('label', { style: { display: 'flex', alignItems: 'center' } },
+                  React.createElement('input', {
+                    type: 'checkbox',
+                    checked: healthAsync.aeDLCOwned === true,
+                    onChange: (e) => {
+                      const checked = e.target.checked;
+                      setHealthAsync(p => ({ ...p, aeDLCOwned: checked ? true : 'unknown', aeDLCOwnedManual: true }));
+                    },
+                    style: { marginRight: '6px', verticalAlign: 'middle' },
+                  }),
+                  React.createElement('span', { style: { position: 'relative', top: '3px' } },
+                    'AE DLC Owned ',
+                    React.createElement('span', {
+                      style: { fontSize: '0.8em', color: '#888', marginLeft: '4px' },
+                    }, healthAsync.aeDLCOwnedManual ? '(manual)' : '(auto)')
+                  )
+                )),
+
               // row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : `${gameName} (No AE DLC)`),
               row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
                 React.createElement('strong', null, 'INI Files:'),
-                iniPaths.length > 0
+                rawIniPaths.length > 0
                   ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                    ...iniPaths
+                    ...rawIniPaths
                     .filter(p => healthAsync.iniPresent[p])
-                    .map(p => React.createElement('li', { key: p }, p))
+                    .map(p => React.createElement('li', { key: p }, displayPath(p)))
                   )
                   : React.createElement('span', null, ' Not available'),
                 React.createElement('div', null,
