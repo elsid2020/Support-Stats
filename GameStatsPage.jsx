@@ -1,10 +1,10 @@
 const React = require('react');
 const { useSelector } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log} = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
-const { shell } = require('electron'); 
+const { shell } = require('electron');
 const { exec, execFile } = require('child_process');
 const { count } = require('console');
 const { json } = require('stream/consumers');
@@ -39,67 +39,67 @@ const filesToSkip = new Set([
 
 function displayPath(fullPath) {
   const tempPath = fullPath.replace(/\\/g, '/').replace(/(\/(?:Users|home)\/)([^/]+)/i, '$1<USER>');
-  return tempPath.replace(/\//g, '\\'); 
+  return tempPath.replace(/\//g, '\\');
 }
 
 // const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
 // const FLAG_LIGHT = 0x00000200; 
 
 // Helper function for grabbing gpu info on Windows and Linux (Wine)
-const GPU_CLASS_KEY = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}';  
-  
-function execReg(cmd) {  
-  return new Promise((resolve) => {  
-    exec(cmd, { windowsHide: true }, (err, stdout) => {  
-      if (err) return resolve(''); 
-      resolve(stdout || '');  
-    });  
-  });  
-}  
-  
+const GPU_CLASS_KEY = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}';
+
+function execReg(cmd) {
+  return new Promise((resolve) => {
+    exec(cmd, { windowsHide: true }, (err, stdout) => {
+      if (err) return resolve('');
+      resolve(stdout || '');
+    });
+  });
+}
+
 // Step 1: list the numbered subkeys (0000, 0001, ...) under the GPU class key  
-async function getGpuSubkeys() {  
-  const output = await execReg(`reg query "${GPU_CLASS_KEY}"`);  
-  const lines = output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);  
-  return lines  
-    .map((line) => line.split('\\').pop())  
-    .filter((sub) => /^\d{4}$/.test(sub));  
-}  
-  
+async function getGpuSubkeys() {
+  const output = await execReg(`reg query "${GPU_CLASS_KEY}"`);
+  const lines = output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return lines
+    .map((line) => line.split('\\').pop())
+    .filter((sub) => /^\d{4}$/.test(sub));
+}
+
 // Step 2: read DriverDesc + qwMemorySize for one subkey  
-async function getGpuInfo(subkey) { 
-  const output = await execReg(`reg query "${GPU_CLASS_KEY}\\${subkey}"`);  
-  const nameMatch = output.match(/DriverDesc\s+REG_\w+\s+(.+)/i);  
-  const memMatch = output.match(/HardwareInformation\.qwMemorySize\s+REG_QWORD\s+0x([0-9a-fA-F]+)/i);  
-  if (!nameMatch) return null;  
-  
-  const name = nameMatch[1].trim();  
-  const isKnownVendor = /intel|amd|nvidia|radeon/i.test(name);  
-  if (!isKnownVendor) return null;  
-  
-  const vramGB = memMatch  
-    ? Math.round((parseInt(memMatch[1], 16) / (1024 ** 3)) * 100) / 100  
-    : null;  
-  return { name, vramGB };  
-}  
-  
+async function getGpuInfo(subkey) {
+  const output = await execReg(`reg query "${GPU_CLASS_KEY}\\${subkey}"`);
+  const nameMatch = output.match(/DriverDesc\s+REG_\w+\s+(.+)/i);
+  const memMatch = output.match(/HardwareInformation\.qwMemorySize\s+REG_QWORD\s+0x([0-9a-fA-F]+)/i);
+  if (!nameMatch) return null;
+
+  const name = nameMatch[1].trim();
+  const isKnownVendor = /intel|amd|nvidia|radeon/i.test(name);
+  if (!isKnownVendor) return null;
+
+  const vramGB = memMatch
+    ? Math.round((parseInt(memMatch[1], 16) / (1024 ** 3)) * 100) / 100
+    : null;
+  return { name, vramGB };
+}
+
 // Step 3: gather every GPU found under the class key  
-async function getGpuList() {  
-  const subkeys = await getGpuSubkeys(); 
-  const results = await Promise.all(subkeys.map(getGpuInfo));  
-  return results.filter(Boolean);  
-}  
-  
-function formatGpuList(list) {  
-  if (list.length === 0) return 'GPU: Unknown';  
-  return list  
-    .map((g) => ` ${g.name} | ${g.vramGB != null ? g.vramGB + 'GB' : '—'}`)  
-    .join('\n');  
+async function getGpuList() {
+  const subkeys = await getGpuSubkeys();
+  const results = await Promise.all(subkeys.map(getGpuInfo));
+  return results.filter(Boolean);
+}
+
+function formatGpuList(list) {
+  if (list.length === 0) return 'GPU: Unknown';
+  return list
+    .map((g) => ` ${g.name} | ${g.vramGB != null ? g.vramGB + 'GB' : '—'}`)
+    .join('\n');
 }
 
 
 function readPluginLightFlag(filePath) {
-  return new Promise((resolve) => {  
+  return new Promise((resolve) => {
     const buf = Buffer.alloc(12);
     const fd = require('fs').open(filePath, 'r', (err, fd) => {
       if (err) return resolve(false);
@@ -110,9 +110,9 @@ function readPluginLightFlag(filePath) {
         if (buf.toString('ascii', 0, 4) !== 'TES4') return resolve(false);
         const flags = buf.readUInt32LE(8);
         resolve((flags & 0x200) !== 0); // FLAG_LIGHT  
-      });  
-    });  
-  });  
+      });
+    });
+  });
 }
 
 // MDI icon paths (hardcoded to avoid ES module import issues)  
@@ -121,16 +121,16 @@ const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S1
 const discordIconPath = "M19.4308 5.26368C18.1561 4.67878 16.7892 4.24785 15.3599 4.00104C15.3339 3.99627 15.3079 4.00818 15.2945 4.03198C15.1187 4.34466 14.9239 4.75258 14.7876 5.0732C13.2503 4.84306 11.721 4.84306 10.2153 5.0732C10.0789 4.74545 9.87707 4.34466 9.70048 4.03198C9.68707 4.00897 9.66107 3.99707 9.63504 4.00104C8.20659 4.24706 6.83963 4.67799 5.56411 5.26368C5.55307 5.26844 5.54361 5.27638 5.53732 5.28669C2.94449 9.16032 2.23421 12.9387 2.58265 16.6703C2.58423 16.6886 2.59447 16.706 2.60867 16.7171C4.31934 17.9734 5.97642 18.7361 7.60273 19.2416C7.62876 19.2496 7.65634 19.24 7.6729 19.2186C8.05761 18.6933 8.40054 18.1393 8.69456 17.5568C8.71192 17.5227 8.69535 17.4822 8.65989 17.4687C8.11594 17.2624 7.598 17.0108 7.09977 16.7251C7.06037 16.7021 7.05721 16.6457 7.09347 16.6187C7.19831 16.5402 7.30318 16.4584 7.4033 16.3759C7.42141 16.3608 7.44665 16.3576 7.46794 16.3671C10.7411 17.8615 14.2846 17.8615 17.5191 16.3671C17.5404 16.3568 17.5657 16.36 17.5846 16.3751C17.6847 16.4576 17.7895 16.5402 17.8952 16.6187C17.9314 16.6457 17.9291 16.7021 17.8897 16.7251C17.3914 17.0163 16.8735 17.2624 16.3288 17.4679C16.2933 17.4814 16.2775 17.5227 16.2949 17.5568C16.5952 18.1385 16.9381 18.6924 17.3157 19.2178C17.3315 19.24 17.3599 19.2496 17.3859 19.2416C19.0201 18.7361 20.6772 17.9734 22.3879 16.7171C22.4028 16.706 22.4123 16.6894 22.4139 16.6711C22.8309 12.357 21.7154 8.60956 19.4568 5.28748C19.4513 5.27638 19.4419 5.26844 19.4308 5.26368ZM9.18335 14.3982C8.19792 14.3982 7.38594 13.4935 7.38594 12.3824C7.38594 11.2713 8.18217 10.3666 9.18335 10.3666C10.1924 10.3666 10.9965 11.2793 10.9807 12.3824C10.9807 13.4935 10.1845 14.3982 9.18335 14.3982ZM15.829 14.3982C14.8435 14.3982 14.0316 13.4935 14.0316 12.3824C14.0316 11.2713 14.8278 10.3666 15.829 10.3666C16.838 10.3666 17.6421 11.2793 17.6264 12.3824C17.6264 13.4935 16.838 14.3982 15.829 14.3982Z";
 
 
-function getDriveInfo(drivePath) {  
-  try {  
-    const root = require('path').parse(drivePath).root || drivePath;  
-    const stats = nodeFs.statfsSync(root);  
-    const freeGB = (stats.bavail * stats.bsize) / (1024 ** 3);  
-    const totalGB = (stats.blocks * stats.bsize) / (1024 ** 3);  
-    return { root, freeGB, totalGB };  
-  } catch {  
-    return null;  
-  }  
+function getDriveInfo(drivePath) {
+  try {
+    const root = require('path').parse(drivePath).root || drivePath;
+    const stats = nodeFs.statfsSync(root);
+    const freeGB = (stats.bavail * stats.bsize) / (1024 ** 3);
+    const totalGB = (stats.blocks * stats.bsize) / (1024 ** 3);
+    return { root, freeGB, totalGB };
+  } catch {
+    return null;
+  }
 }
 
 // Minimum versions considered "current"  
@@ -144,28 +144,28 @@ function getIniPaths(gameId) {
   return subPaths.map(p => path.join(docsPath, 'My Games', p));
 }
 
-function getCollectionStats(collectionMod, mods, profile) {  
-  const rules = collectionMod.rules ?? [];  
-  const stats = { enabled: 0, disabled: 0, notInstalled: 0, ignored: 0 };  
-  
-  rules  
-    .filter(r => ['requires', 'recommends'].includes(r.type))  
-    .forEach(rule => {  
-      if (rule.ignored === true) {  
-        stats.ignored++;  
-        return;  
-      }  
-      const referencedMod = util.findModByRef(rule.reference, mods);  
-      if (referencedMod === undefined) {  
-        stats.notInstalled++;  
-        return;  
-      }  
-      const isEnabled = profile?.modState?.[referencedMod.id]?.enabled === true;  
-      isEnabled ? stats.enabled++ : stats.disabled++;  
-    })  
-  
+function getCollectionStats(collectionMod, mods, profile) {
+  const rules = collectionMod.rules ?? [];
+  const stats = { enabled: 0, disabled: 0, notInstalled: 0, ignored: 0 };
 
-  return stats;  
+  rules
+    .filter(r => ['requires', 'recommends'].includes(r.type))
+    .forEach(rule => {
+      if (rule.ignored === true) {
+        stats.ignored++;
+        return;
+      }
+      const referencedMod = util.findModByRef(rule.reference, mods);
+      if (referencedMod === undefined) {
+        stats.notInstalled++;
+        return;
+      }
+      const isEnabled = profile?.modState?.[referencedMod.id]?.enabled === true;
+      isEnabled ? stats.enabled++ : stats.disabled++;
+    })
+
+
+  return stats;
 }
 
 function row(label, value) {
@@ -348,14 +348,14 @@ const faqItems = [
 
 
 function openScreenshotTool() {
-  if ( process.platform === 'win32') {
-    
+  if (process.platform === 'win32') {
+
     shell.openExternal('ms-screenclip:');
     return;
   }
 
   if (process.platform === 'linux') {
-    
+
     // Try tools in order of preference  
     const tools = [
       'flameshot gui',           // cross-desktop, most popular  
@@ -407,15 +407,15 @@ function GameStatsPage({ api }) {
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
   const [refreshKey, setRefreshKey] = React.useState(0);
-  
-  
+
+
   const gameInfo = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
     return state.persistent.gameMode.gameInfo?.[gameId] || {};
   });
   const profile = useSelector((state) => selectors.activeProfile(state));
 
-  
+
   const gameDiscovery = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
     return state?.settings?.gameMode?.discovered?.[gameId] || {};
@@ -443,162 +443,162 @@ function GameStatsPage({ api }) {
     return state?.settings?.mods?.activator[gameId] || 'unknown';
   });
 
-  const deploymentMethodLabel = activatorId  
-  ? (knownActivators[activatorId] ?? activatorId)   // fallback to raw id if unmapped  
-  : 'Unknown';
+  const deploymentMethodLabel = activatorId
+    ? (knownActivators[activatorId] ?? activatorId)   // fallback to raw id if unmapped  
+    : 'Unknown';
 
-const [healthAsync, setHealthAsync] = useState({  
-  updateAvailable: null,  
-  updateVersion: null,  
-  iniPresent: false,  
-  suppressedMap: null,  
-  aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data 
-  aeDLCOwnedManual: false,   // true=checked manually
-  activatorType: deploymentMethodLabel,
-});  
+  const [healthAsync, setHealthAsync] = useState({
+    updateAvailable: null,
+    updateVersion: null,
+    iniPresent: false,
+    suppressedMap: null,
+    aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data 
+    aeDLCOwnedManual: false,   // true=checked manually
+    activatorType: deploymentMethodLabel,
+  });
 
-const pluginList = useSelector(state =>  
-  (state.session?.plugins?.pluginList) ?? {}  
-);  
-  
-const nativeCount = Object.values(pluginList).filter(p => p.isNative).length;  
-  
-// true = full AE, false = not installed, 'partial' = some files missing  
-const aeDLCInstalled =  
-  nativeCount === 80 ? true :  
-  nativeCount === 10 ? false :  
-  nativeCount > 10   ? 'partial' :  
-  null; // pluginList not loaded yet
+  const pluginList = useSelector(state =>
+    (state.session?.plugins?.pluginList) ?? {}
+  );
 
-function getSteamPath() {  
-  if (process.env.WINEPREFIX || process.env.WINELOADER) {
-    // Wine host 
-    const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
-    const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
-    return wineResult;
-  } else if ((!process.env.WINEPREFIX || process.env.WINELOADER) && process.platform === 'win32') {  
-    // Windows host
-    try {  
-      const winapi = require('winapi-bindings');  
-      const result = winapi.RegGetValue(  
-        'HKEY_CURRENT_USER',  
-        'Software\\Valve\\Steam',  
-        'SteamPath'  
-      );  
-      return result.value;  
-    } catch (err) {  
-      return undefined;  
-    }  
-  } else {  
-    // Linux host paths  
-    const os = require('os');  
-    const path = require('path');  
-    const fs = require('fs');  
-    const home = os.homedir();  
-    const candidates = [  
-      path.join(home, '.local', 'share', 'Steam'),  
-      path.join(home, '.steam', 'debian-installation'),  
-      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),  
-      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),  
-      path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam'),  
-      path.join(home, '.steam', 'steam'),  
-    ];  
-    for (const candidate of candidates) {  
-      if (fs.existsSync)// (path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
-        return candidate;  
-      }  
-    }  
-    return undefined;  
-  }  
+  const nativeCount = Object.values(pluginList).filter(p => p.isNative).length;
+
+  // true = full AE, false = not installed, 'partial' = some files missing  
+  const aeDLCInstalled =
+    nativeCount === 80 ? true :
+      nativeCount === 10 ? false :
+        nativeCount > 10 ? 'partial' :
+          null; // pluginList not loaded yet
+
+  function getSteamPath() {
+    if (process.env.WINEPREFIX || process.env.WINELOADER) {
+      // Wine host 
+      const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
+      const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
+      return wineResult;
+    } else if ((!process.env.WINEPREFIX || process.env.WINELOADER) && process.platform === 'win32') {
+      // Windows host
+      try {
+        const winapi = require('winapi-bindings');
+        const result = winapi.RegGetValue(
+          'HKEY_CURRENT_USER',
+          'Software\\Valve\\Steam',
+          'SteamPath'
+        );
+        return result.value;
+      } catch (err) {
+        return undefined;
+      }
+    } else {
+      // Linux host paths  
+      const os = require('os');
+      const path = require('path');
+      const fs = require('fs');
+      const home = os.homedir();
+      const candidates = [
+        path.join(home, '.local', 'share', 'Steam'),
+        path.join(home, '.steam', 'debian-installation'),
+        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),
+        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
+        path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam'),
+        path.join(home, '.steam', 'steam'),
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync)// (path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
+          return candidate;
+      }
+    }
+    return undefined;
+  }
 
 
   // --- file-check effect ---
-useEffect(() => {
-  let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-  function extractBracedSection(text, key) {
-    // depth-aware brace matching instead of a naive regex
-    const keyIdx = text.search(new RegExp(`"${key}"\\s*\\{`, 'i'));
-    if (keyIdx === -1) return null;
-    const openIdx = text.indexOf('{', keyIdx);
-    let depth = 0;
-    for (let i = openIdx; i < text.length; i++) {
-      if (text[i] === '{') depth++;
-      else if (text[i] === '}') {
-        depth--;
-        if (depth === 0) return text.slice(openIdx + 1, i);
+    function extractBracedSection(text, key) {
+      // depth-aware brace matching instead of a naive regex
+      const keyIdx = text.search(new RegExp(`"${key}"\\s*\\{`, 'i'));
+      if (keyIdx === -1) return null;
+      const openIdx = text.indexOf('{', keyIdx);
+      let depth = 0;
+      for (let i = openIdx; i < text.length; i++) {
+        if (text[i] === '{') depth++;
+        else if (text[i] === '}') {
+          depth--;
+          if (depth === 0) return text.slice(openIdx + 1, i);
+        }
       }
+      return null; // unterminated — treat as not found
     }
-    return null; // unterminated — treat as not found
-  }
 
-  async function readWithTimeout(filePath, ms = 3000) {
-    return Promise.race([
-      fs.readFileAsync(filePath, 'utf8'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-    ]);
-  }
+    async function readWithTimeout(filePath, ms = 3000) {
+      return Promise.race([
+        fs.readFileAsync(filePath, 'utf8'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+      ]);
+    }
 
-  async function checkAEOwnership() {
+    async function checkAEOwnership() {
 
-    if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwnedManual: false }));
-
-    try {
-      const steamPath = getSteamPath();
-      if (!steamPath) {
-        if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));
-        return;
-      }
-      const userDataPath = path.join(steamPath, 'userdata');
-      let owned = false;
+      if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwnedManual: false }));
 
       try {
-        const userIds = await fs.readdirAsync(userDataPath);
-        for (const userId of userIds) {
-          const localConfigPath = path.join(userDataPath, userId, 'config', 'localconfig.vdf');
-          try {
-            let data = await readWithTimeout(localConfigPath);
-            if (data.charCodeAt(0) === 0xfeff) data = data.slice(1); // strip BOM
-            const section = extractBracedSection(data, 'apptickets');
-            if (section && /"1746860"/.test(section)) {
-              owned = true;
-              break;
-            }
-          } catch (err) {
-            if (err.code && err.code !== 'ENOENT') {
-              console.warn(`AE ownership check: unexpected error reading ${localConfigPath}`, err);
+        const steamPath = getSteamPath();
+        if (!steamPath) {
+          if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));
+          return;
+        }
+        const userDataPath = path.join(steamPath, 'userdata');
+        let owned = false;
+
+        try {
+          const userIds = await fs.readdirAsync(userDataPath);
+          for (const userId of userIds) {
+            const localConfigPath = path.join(userDataPath, userId, 'config', 'localconfig.vdf');
+            try {
+              let data = await readWithTimeout(localConfigPath);
+              if (data.charCodeAt(0) === 0xfeff) data = data.slice(1); // strip BOM
+              const section = extractBracedSection(data, 'apptickets');
+              if (section && /"1746860"/.test(section)) {
+                owned = true;
+                break;
+              }
+            } catch (err) {
+              if (err.code && err.code !== 'ENOENT') {
+                console.warn(`AE ownership check: unexpected error reading ${localConfigPath}`, err);
+              }
             }
           }
+        } catch (err) {
+          if (err.code && err.code !== 'ENOENT') {
+            console.warn('AE ownership check: unexpected error listing userdata', err);
+          }
         }
-      } catch (err) {
-        if (err.code && err.code !== 'ENOENT') {
-          console.warn('AE ownership check: unexpected error listing userdata', err);
+
+        if (!owned) {
+          try {
+            const logPath = path.join(steamPath, 'logs', 'appinfo_log.previous.txt');
+            const logData = await readWithTimeout(logPath);
+            if (logData.includes('1746860=')) owned = true;
+          } catch { /* diagnostic fallback unavailable, ignore */ }
         }
-      }
 
-      if (!owned) {
-        try {
-          const logPath = path.join(steamPath, 'logs', 'appinfo_log.previous.txt');
-          const logData = await readWithTimeout(logPath);
-          if (logData.includes('1746860=')) owned = true;
-        } catch { /* diagnostic fallback unavailable, ignore */ }
+        if (!cancelled) {
+          setHealthAsync(p =>
+            p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: owned ? true : 'unknown' }
+          );
+        }
+      } catch {
+        if (!cancelled) setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: 'unknown' }));
       }
-
-      if (!cancelled) {
-        setHealthAsync(p =>
-          p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: owned ? true : 'unknown' }
-        );
-      }
-    } catch {
-      if (!cancelled) setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: 'unknown' }));
     }
-  }
 
-  checkAEOwnership();
-  return () => { cancelled = true; };
-}, [refreshKey]); 
+    checkAEOwnership();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
 
-const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
+  const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
 
 
 
@@ -606,12 +606,12 @@ const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
 
-  const [hardwareInfo, setHardwareInfo] = React.useState({  
-  cpu: 'Loading...',  
-  ram: 'Loading...',  
-  gpu: 'Loading...',  
-  os: 'Loading...',  
-});
+  const [hardwareInfo, setHardwareInfo] = React.useState({
+    cpu: 'Loading...',
+    ram: 'Loading...',
+    gpu: 'Loading...',
+    os: 'Loading...',
+  });
 
   React.useEffect(() => {
     const { exec } = require('child_process');
@@ -631,58 +631,58 @@ const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
     setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));
 
     // GPU
-    if (process.platform === 'win32') {  
-  // Will work for Wine or Windows  
-    let cancelled = false;  
-  
-  getGpuList().then((list) => {  
-    if (cancelled) return;  
-    setHealthAsync((p) => ({ ...p, gpu: list }));  
-  });  
-}
-  return () => { cancelled = true; };  
-    
-}, []);
-  
+    if (process.platform === 'win32') {
+      // Will work for Wine or Windows  
+      let cancelled = false;
 
-  function getOSFlavor() {  
-  return new Promise((resolve) => {  
-    if (process.env.WINEPREFIX || process.env.WINELOADER) {  
-      // Wine on Linux — check this BEFORE the win32 branch  
-      nodeFs.readFile('Z:\\run\\host\\etc\\os-release', 'utf8', (err, data) => {  
-        if (err) {  
-          nodeFs.readFile('Z:\\proc\\version', 'utf8', (err2, vdata) => {  
-            if (err2) return resolve('Linux (via Wine)');  
-            const match = vdata.match(/Linux version (\S+)/);  
-            resolve(match ? `Linux ${match[1]} (via Wine)` : 'Linux (via Wine)');  
-          });  
-          return;  
-        }  
-        const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);  
-        resolve(match ? `${match[1]} (via Wine)` : 'Linux (via Wine)');  
-      });  
-    } else if (process.platform === 'win32') {  
-      exec(  
-        'powershell -NoProfile -Command "(Get-WmiObject Win32_OperatingSystem).Caption"',  
-        (err, stdout) => {  
-          if (err || !stdout.trim()) {  
-            resolve(`Windows (${require('os').release()})`);  
-          } else {  
-            resolve(stdout.trim().replace('Microsoft ', ''));  
-          }  
-        }  
-      );  
-    } else if (process.platform === 'linux') {  
-      nodeFs.readFile('/etc/os-release', 'utf8', (err, data) => {  
-        if (err) return resolve(`Linux (${require('os').release()})`);  
-        const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);  
-        resolve(match ? match[1] : `Linux (${require('os').release()})`);  
-      });  
-    } else {  
-      resolve(`${require('os').type()} ${require('os').release()}`);  
-    }  
-  });  
-}
+      getGpuList().then((list) => {
+        if (cancelled) return;
+        setHealthAsync((p) => ({ ...p, gpu: list }));
+      });
+    }
+    return () => { cancelled = true; };
+
+  }, []);
+
+
+  function getOSFlavor() {
+    return new Promise((resolve) => {
+      if (process.env.WINEPREFIX || process.env.WINELOADER) {
+        // Wine on Linux — check this BEFORE the win32 branch  
+        nodeFs.readFile('Z:\\run\\host\\etc\\os-release', 'utf8', (err, data) => {
+          if (err) {
+            nodeFs.readFile('Z:\\proc\\version', 'utf8', (err2, vdata) => {
+              if (err2) return resolve('Linux (via Wine)');
+              const match = vdata.match(/Linux version (\S+)/);
+              resolve(match ? `Linux ${match[1]} (via Wine)` : 'Linux (via Wine)');
+            });
+            return;
+          }
+          const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);
+          resolve(match ? `${match[1]} (via Wine)` : 'Linux (via Wine)');
+        });
+      } else if (process.platform === 'win32') {
+        exec(
+          'powershell -NoProfile -Command "(Get-WmiObject Win32_OperatingSystem).Caption"',
+          (err, stdout) => {
+            if (err || !stdout.trim()) {
+              resolve(`Windows (${require('os').release()})`);
+            } else {
+              resolve(stdout.trim().replace('Microsoft ', ''));
+            }
+          }
+        );
+      } else if (process.platform === 'linux') {
+        nodeFs.readFile('/etc/os-release', 'utf8', (err, data) => {
+          if (err) return resolve(`Linux (${require('os').release()})`);
+          const match = data.match(/^PRETTY_NAME="?([^"\n]+)"?/m);
+          resolve(match ? match[1] : `Linux (${require('os').release()})`);
+        });
+      } else {
+        resolve(`${require('os').type()} ${require('os').release()}`);
+      }
+    });
+  }
 
   //for health checks
   const suppressedNotifications = useSelector((state) =>
@@ -694,6 +694,30 @@ const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
   const needToDeploy = useSelector((state) =>
     state.persistent?.deployment?.needToDeploy?.[activeGameId] === true
   );
+
+  const [manifest, setManifest] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function fetchManifest() {
+      try {
+        const result = await util.getManifest(api, undefined, activeGameId);
+        if (!cancelled) setManifest(result);
+      } catch (err) {
+        if (!cancelled) setManifest(null);
+      }
+    }
+
+    fetchManifest();
+
+    return () => { cancelled = true; };
+  }, [activeGameId, refreshKey]); // add refreshKey if you want manual re-check support  
+
+  const deployedFileCount = manifest?.files?.length ?? null;
+  const isDeployed = deployedFileCount !== null && !needToDeploy && deployedFileCount > 0;
+
+
   const loadOrder = useSelector((state) => state.loadOrder || {});
   const primaryToolId = useSelector((state) =>
     state.settings?.interface?.primaryTool?.[activeGameId] ?? null
@@ -720,21 +744,21 @@ const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
 
   const spaceUsed = gameInfo?.size?.value;
   const spaceNoLinks = gameInfo?.size_nolinks?.value;
- 
-  const [driveInfo, setDriveInfo] = useState({ game: null, system: null });  
-  
-useEffect(() => {  
-  if (!gamePath || gamePath === 'Not discovered') return;  
-  
-  const systemRoot = process.platform === 'win32'  
-    ? (process.env.SystemDrive || 'C:') + '\\'  
-    : '/';  
-  
-  setDriveInfo({  
-    game: getDriveInfo(gamePath),  
-    system: getDriveInfo(systemRoot),  
-  });  
-}, [gamePath]);
+
+  const [driveInfo, setDriveInfo] = useState({ game: null, system: null });
+
+  useEffect(() => {
+    if (!gamePath || gamePath === 'Not discovered') return;
+
+    const systemRoot = process.platform === 'win32'
+      ? (process.env.SystemDrive || 'C:') + '\\'
+      : '/';
+
+    setDriveInfo({
+      game: getDriveInfo(gamePath),
+      system: getDriveInfo(systemRoot),
+    });
+  }, [gamePath, refreshKey]);
 
   // Format with Vortex's built-in formatter  
   const spaceUsedStr = spaceUsed != null ? util.bytesToString(spaceUsed) : 'Calculating...';
@@ -774,33 +798,33 @@ useEffect(() => {
           d.mountpoints && d.mountpoints.some(mp => mp.path === volume)
         );
 
-      if (!disk) {
+        if (!disk) {
+          setIsRemovable(false);
+          return;
+        }
+
+        // drivelist device is usually \\.\PHYSICALDRIVE#
+        const diskNumber = disk.device.match(/PHYSICALDRIVE(\d+)/i)?.[1];
+
+        if (diskNumber === undefined) {
+          setIsRemovable(false);
+          return;
+        }
+
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        // Better as long as the user has PowerShell available (Windows 7+). For Wine we need a better solution.
+        const { stdout } = await execAsync(
+          `powershell -NoProfile -Command "Get-Disk -Number ${diskNumber} | Select-Object -ExpandProperty BusType"`
+        );
+
+        setIsRemovable(stdout.trim() === 'USB');
+
+      } catch (err) {
         setIsRemovable(false);
-        return;
       }
-
-      // drivelist device is usually \\.\PHYSICALDRIVE#
-      const diskNumber = disk.device.match(/PHYSICALDRIVE(\d+)/i)?.[1];
-
-      if (diskNumber === undefined) {
-        setIsRemovable(false);
-        return;
-      }
-
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
-      const execAsync = promisify(exec);
-      // Better as long as the user has PowerShell available (Windows 7+). For Wine we need a better solution.
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "Get-Disk -Number ${diskNumber} | Select-Object -ExpandProperty BusType"`
-      );
-
-      setIsRemovable(stdout.trim() === 'USB');
-
-    } catch (err) {
-      setIsRemovable(false);
-    }
-  };
+    };
 
 
     checkRemovable();
@@ -830,8 +854,8 @@ useEffect(() => {
   });
 
   const hasShownWelcome = useRef(false);
-  const welcomeSeen = useSelector(state => state?.settings?.immersiveSupport?.welcomeSeen ?? false);  
-  const dispatch = require('react-redux').useDispatch();  
+  const welcomeSeen = useSelector(state => state?.settings?.immersiveSupport?.welcomeSeen ?? false);
+  const dispatch = require('react-redux').useDispatch();
 
   useEffect(() => {
     if (!welcomeSeen && isImmersiveCollectionEnabled && !hasShownWelcome.current) {
@@ -885,98 +909,98 @@ useEffect(() => {
       'game-stats-welcome'
     ).then((result) => {
       if (result.input['dont_show_again']) {
-        const dismissWelcome = () => dispatch({ type: 'IMMERSIVE_SET_WELCOME_SEEN', payload: true });  
-        
+        const dismissWelcome = () => dispatch({ type: 'IMMERSIVE_SET_WELCOME_SEEN', payload: true });
+
       }
     });
   }
 
 
-const updateChannel = useSelector(state => state.settings?.update?.channel ?? 'stable');  
-  
-// Separate useEffect that check the github repo API. rate limit 60/IP per hour
-useEffect(() => {  
-  const currentVersion = util.getApplication().version;  
-  const channel = updateChannel;  
-  
-  util.github.releases()  
-    .then(releases => {  
-      // Filter based on channel: include prereleases only on beta channel  
-      const candidates = releases.filter(rel =>  
-        channel !== 'stable' ? true : !rel.prerelease  
-      );  
-  
-      // Find the newest release that is newer than the current version  
-      const latest = candidates  
-        .filter(rel => semver.valid(rel.name) && semver.gt(rel.name, currentVersion))  
-        .sort((a, b) => semver.compare(b.name, a.name))[0];  
-  
-      setHealthAsync(p => ({  
-        ...p,  
-        updateAvailable: latest !== undefined,  
-        updateVersion: latest?.name ?? null,  
-      }));  
-    })  
-    .catch(() => {  
-      setHealthAsync(p => ({ ...p, updateAvailable: false, updateVersion: null }));  
-    });  
-}, []);
- 
-useEffect(() => {
-  const checkIniFiles = async () => {
-    try {
-      const results = await Promise.all(
-        rawIniPaths.map(async (p) => {
-          try {
-            const stats = await fs.statAsync(p);
-            return stats.size > 0;
-          } catch {
-            return false;
-          }
-        })
-      );
+  const updateChannel = useSelector(state => state.settings?.update?.channel ?? 'stable');
 
-      const statusMap = rawIniPaths.reduce((acc, path, index) => {
-        acc[path] = results[index];
-        return acc;
-      }, {});
+  // Separate useEffect that check the github repo API. rate limit 60/IP per hour
+  useEffect(() => {
+    const currentVersion = util.getApplication().version;
+    const channel = updateChannel;
 
+    util.github.releases()
+      .then(releases => {
+        // Filter based on channel: include prereleases only on beta channel  
+        const candidates = releases.filter(rel =>
+          channel !== 'stable' ? true : !rel.prerelease
+        );
 
-      setHealthAsync((p) => ({ 
-        ...p, 
-        iniPresent: statusMap 
-      }));
-      
-    } catch (error) {
-      console.error("Error checking INI files:", error);
-      // Ensure state is never null in case of error
-      setHealthAsync((p) => ({ ...p, iniPresent: {} }));
-    }
-  };
+        // Find the newest release that is newer than the current version  
+        const latest = candidates
+          .filter(rel => semver.valid(rel.name) && semver.gt(rel.name, currentVersion))
+          .sort((a, b) => semver.compare(b.name, a.name))[0];
 
-  checkIniFiles();
-}, [activeGameId, refreshKey]);
+        setHealthAsync(p => ({
+          ...p,
+          updateAvailable: latest !== undefined,
+          updateVersion: latest?.name ?? null,
+        }));
+      })
+      .catch(() => {
+        setHealthAsync(p => ({ ...p, updateAvailable: false, updateVersion: null }));
+      });
+  }, []);
 
-/*  useEffect(() => {
-    // --- INI files present ---  
+  useEffect(() => {
     const checkIniFiles = async () => {
-      const results = await Promise.all(
-        iniPaths.map(p =>
-          fs.statAsync(p)
-            .then((stats) => stats.size > 0)
-            .catch(() => false)
-        )
-      );
-      console.log('====INI file check results:', results);
-      const iniOk = iniPaths.length > 0 && results.every(r => r === true);
-      setHealthAsync((p) => ({ ...p, iniPresent: results }));
+      try {
+        const results = await Promise.all(
+          rawIniPaths.map(async (p) => {
+            try {
+              const stats = await fs.statAsync(p);
+              return stats.size > 0;
+            } catch {
+              return false;
+            }
+          })
+        );
+
+        const statusMap = rawIniPaths.reduce((acc, path, index) => {
+          acc[path] = results[index];
+          return acc;
+        }, {});
+
+
+        setHealthAsync((p) => ({
+          ...p,
+          iniPresent: statusMap
+        }));
+
+      } catch (error) {
+        console.error("Error checking INI files:", error);
+        // Ensure state is never null in case of error
+        setHealthAsync((p) => ({ ...p, iniPresent: {} }));
+      }
     };
 
     checkIniFiles();
-  }, [activeGameId, refreshKey]); */
+  }, [activeGameId, refreshKey]);
+
+  /*  useEffect(() => {
+      // --- INI files present ---  
+      const checkIniFiles = async () => {
+        const results = await Promise.all(
+          iniPaths.map(p =>
+            fs.statAsync(p)
+              .then((stats) => stats.size > 0)
+              .catch(() => false)
+          )
+        );
+        console.log('====INI file check results:', results);
+        const iniOk = iniPaths.length > 0 && results.every(r => r === true);
+        setHealthAsync((p) => ({ ...p, iniPresent: results }));
+      };
+  
+      checkIniFiles();
+    }, [activeGameId, refreshKey]); */
 
   // Deployment  
-  const isDeployed = !needToDeploy;
+
 
   const pluginsSorted = useSelector((state) =>
     state?.persistent?.immersiveSupport?.pluginsSorted === true
@@ -1025,20 +1049,20 @@ useEffect(() => {
   const [xseExistsAtStored, setXseExistsAtStored] = useState(false);
 
   //// attempt at checking xse
-  useEffect(() => {  
-  if (!expectedXsePath) return;  
-  fs.statAsync(expectedXsePath)  
-    .then(() => setXseExistsAtExpected(true))  
-    .catch(() => setXseExistsAtExpected(false));  
-  
-  if (xseTool?.path) {  
-    fs.statAsync(xseTool.path)  
-      .then(() => setXseExistsAtStored(true))  
-      .catch(() => setXseExistsAtStored(false));  
-  } else {  
-    setXseExistsAtStored(false); // ← reset when path is gone  
-  }  
-}, [expectedXsePath, xseTool?.path, refreshKey]);
+  useEffect(() => {
+    if (!expectedXsePath) return;
+    fs.statAsync(expectedXsePath)
+      .then(() => setXseExistsAtExpected(true))
+      .catch(() => setXseExistsAtExpected(false));
+
+    if (xseTool?.path) {
+      fs.statAsync(xseTool.path)
+        .then(() => setXseExistsAtStored(true))
+        .catch(() => setXseExistsAtStored(false));
+    } else {
+      setXseExistsAtStored(false); // ← reset when path is gone  
+    }
+  }, [expectedXsePath, xseTool?.path, refreshKey]);
 
 
   const [rawUnmanaged, setRawUnmanaged] = useState({ plugins: [], animations: [], meshes: [], textures: [], dlls: [], loading: true });
@@ -1074,10 +1098,10 @@ useEffect(() => {
     }
 
     const scanPlugins = walkUnmanaged(dataPath, 1)
-      .then(files => files.filter(f => 
+      .then(files => files.filter(f =>
         ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))
       );
-      
+
 
     const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>
       files.filter(f => path.extname(f.name).toLowerCase() === '.dll')
@@ -1118,7 +1142,7 @@ useEffect(() => {
         setRawUnmanaged(prev => ({ ...prev, loading: false }));
       });
 
-    
+
   }, [gamePath, activeGameId, refreshKey]);
 
 
@@ -1189,7 +1213,7 @@ useEffect(() => {
       });
     });
     return map;;
-  }, [mods]);
+  }, [mods, refreshKey]);
 
   const enabledModIds = Object.keys(profile?.modState || {}).filter(
     (modId) => profile.modState[modId]?.enabled === true
@@ -1234,11 +1258,12 @@ useEffect(() => {
   const [pluginHeaders, setPluginHeaders] = React.useState({});
 
   const isLight = (id) => {
-  if (pluginInfo[id]?.isLight) {
-    return true};  
+    if (pluginInfo[id]?.isLight) {
+      return true
+    };
     const filePath = pluginList[id]?.filePath || '';
     if (filePath.toLowerCase().endsWith('.esl')) return true;
-  return pluginHeaders[id] === true;  
+    return pluginHeaders[id] === true;
   };
 
   useEffect(() => {
@@ -1251,8 +1276,8 @@ useEffect(() => {
       ids.map(id => {
         const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
         return readPluginLightFlag(filePath)
-        .then(isLight => [id, isLight])  
-        .catch(() => [id, false]);  
+          .then(isLight => [id, isLight])
+          .catch(() => [id, false]);
       })
     ).then(results => {
       setPluginHeaders(Object.fromEntries(results));
@@ -1263,15 +1288,15 @@ useEffect(() => {
   const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder, refreshKey]);
   const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders, refreshKey]);
   const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders, refreshKey]);
-  const missingMasters = React.useMemo(() => {  
-    const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));  
-    const result = {};  
-    activePlugins.forEach(id => {  
-      const masters = pluginHeaders[id]?.masterList ?? [];  
-      const missing = masters.filter(m => !activeSet.has(m.toLowerCase()));  
-      if (missing.length > 0) result[id] = missing;  
-    });  
-    return result;  
+  const missingMasters = React.useMemo(() => {
+    const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));
+    const result = {};
+    activePlugins.forEach(id => {
+      const masters = pluginHeaders[id]?.masterList ?? [];
+      const missing = masters.filter(m => !activeSet.has(m.toLowerCase()));
+      if (missing.length > 0) result[id] = missing;
+    });
+    return result;
   }, [activePlugins, pluginHeaders, refreshKey]);
 
   const regularLimit = eslGame ? 254 : 255;
@@ -1294,12 +1319,12 @@ useEffect(() => {
   const profileModCounts = useSelector((state) => {
     const counts = {};
     gameProfiles.forEach((profile) => {
-      const mods = state.persistent.mods[profile.gameId] || {};  
-    counts[profile.id] = Object.keys(profile.modState || {})  
-      .filter(id => profile.modState[id]?.enabled && mods[id]?.state === 'installed')  
-      .length;  
-  }); 
-  return counts;
+      const mods = state.persistent.mods[profile.gameId] || {};
+      counts[profile.id] = Object.keys(profile.modState || {})
+        .filter(id => profile.modState[id]?.enabled && mods[id]?.state === 'installed')
+        .length;
+    });
+    return counts;
   }, shallowEqual);
 
   const gameProfileCount = gameProfiles.length;
@@ -1370,11 +1395,11 @@ useEffect(() => {
 
       //Right button group
       React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        React.createElement('button', {  
-  onClick: openScreenshotTool,  
-  className: 'btn btn-default btn-s',
-  title: '⊞Win + Shift + S',  
-}, 'Take Screenshot'),
+        React.createElement('button', {
+          onClick: openScreenshotTool,
+          className: 'btn btn-default btn-s',
+          title: '⊞Win + Shift + S',
+        }, 'Take Screenshot'),
         React.createElement('button', {
           className: 'btn btn-default',
           style: { display: 'flex', alignItems: 'center' },
@@ -1425,7 +1450,7 @@ useEffect(() => {
           },
             React.createElement('div', null,
               React.createElement('strong', null, ' OS: '),
-               hardwareInfo.os,
+              hardwareInfo.os,
             ),
             React.createElement('div', null,
               React.createElement('strong', null, 'CPU: '),
@@ -1436,7 +1461,7 @@ useEffect(() => {
               hardwareInfo.ram
             ),
 
-            React.createElement('div', { style: { display: 'flex' , whiteSpace: 'pre' } },
+            React.createElement('div', { style: { display: 'flex', whiteSpace: 'pre' } },
               React.createElement('strong', null, 'GPU: '),
               React.createElement('div', null,
                 formatGpuList(healthAsync.gpu ?? [])),
@@ -1477,8 +1502,8 @@ useEffect(() => {
                 rawIniPaths.length > 0
                   ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
                     ...rawIniPaths
-                    .filter(p => healthAsync.iniPresent[p])
-                    .map(p => React.createElement('li', { key: p }, displayPath(p)))
+                      .filter(p => healthAsync.iniPresent[p])
+                      .map(p => React.createElement('li', { key: p }, displayPath(p)))
                   )
                   : React.createElement('span', null, ' Not available'),
                 React.createElement('div', null,
@@ -1600,7 +1625,7 @@ useEffect(() => {
                       React.createElement('li', null, `${unmanagedFiles.meshes.length} meshes, ` +
                         `${unmanagedFiles.animations.length} animations`
                       ),),
-                    
+
                   )),
             ),
           ),
@@ -1610,12 +1635,12 @@ useEffect(() => {
             //column 1
             React.createElement('div', { style: { flex: '1' } },
               row('Active Profile: ', profileName),
-            React.createElement('ul', { style: { margin: '2px 0' } },
-              row('Active Mods per Profile: '),
-              React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                ...gameProfiles.map((p) =>
-                  React.createElement('li', { key: p.id }, `${p.name} (${profileModCounts[p.id] || 0})`)
-                ))
+              React.createElement('ul', { style: { margin: '2px 0' } },
+                row('Active Mods per Profile: '),
+                React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
+                  ...gameProfiles.map((p) =>
+                    React.createElement('li', { key: p.id }, `${p.name} (${profileModCounts[p.id] || 0})`)
+                  ))
               ),
             ),
 
@@ -1655,15 +1680,15 @@ useEffect(() => {
         },
           React.createElement('h3', { style: { marginTop: 0, marginBottom: '12px' } }, 'Health Checks'),
           React.createElement('button', {
-                      onClick: () => setRefreshKey(k => k + 1),
-                      className: 'btn btn-default btn-xs', style: { marginRight: '6px' }
-                    }, 'Refresh'),
+            onClick: () => setRefreshKey(k => k + 1),
+            className: 'btn btn-default btn-xs', style: { marginRight: '6px' }
+          }, 'Refresh'),
           React.createElement('div', {
             style: { display: 'flex', gap: '32px', justifyContent: 'center' }
           },
             // Column 1  
             React.createElement('div', { style: { flex: '0 0 auto' } },
-              healthRow('Mods Deployed', !needToDeploy, null,
+              healthRow('Mods Deployed', isDeployed, null,
                 () => api.events.emit("show-main-page", "Mods")),
               healthRow('Plugins Sorted', pluginsSorted, null,
                 () => api.events.emit("show-main-page", "gamebryo-plugins")),
@@ -1678,10 +1703,10 @@ useEffect(() => {
             React.createElement('div', { style: { flex: '0 0 auto' } },
               healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
                 healthAsync.updateAvailable === null
-                ? 'Checking...'
-                : healthAsync.updateAvailable && healthAsync.updateVersion 
-                  ? `${healthAsync.updateVersion} Pending`
-                  : 'Vortex is up to date'),
+                  ? 'Checking...'
+                  : healthAsync.updateAvailable && healthAsync.updateVersion
+                    ? `${healthAsync.updateVersion} Pending`
+                    : 'Vortex is up to date'),
               healthRow('Deployment Method: ' + healthAsync.activatorType, healthAsync.activatorType === "Hardlinks", healthAsync.activatorType === null),
               healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
               healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),
