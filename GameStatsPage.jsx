@@ -38,7 +38,8 @@ const filesToSkip = new Set([
 ]);
 
 function displayPath(fullPath) {
-  return fullPath.replace(/\\/g, '/').replace(/(\/(?:Users|home)\/)([^/]+)/i, '$1<USER>');
+  const tempPath = fullPath.replace(/\\/g, '/').replace(/(\/(?:Users|home)\/)([^/]+)/i, '$1<USER>');
+  return tempPath.replace(/\//g, '\\'); 
 }
 
 // const PLUGIN_EXTS = new Set(['.esp', '.esm', '.esl']);  
@@ -427,7 +428,8 @@ function GameStatsPage({ api }) {
 
   const stagingPath = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
-    return selectors.installPathForGame(state, gameId);
+    const rawPath = selectors.installPathForGame(state, gameId);
+    return displayPath(rawPath || 'Not discovered');
   });
 
   const knownActivators = {
@@ -452,6 +454,7 @@ const [healthAsync, setHealthAsync] = useState({
   suppressedMap: null,  
   aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data 
   aeDLCOwnedManual: false,   // true=checked manually
+  activatorType: deploymentMethodLabel,
 });  
 
 const pluginList = useSelector(state =>  
@@ -1421,7 +1424,7 @@ useEffect(() => {
             }
           },
             React.createElement('div', null,
-              React.createElement('strong', null, 'OS: '),
+              React.createElement('strong', null, ' OS: '),
                hardwareInfo.os,
             ),
             React.createElement('div', null,
@@ -1679,6 +1682,7 @@ useEffect(() => {
                 : healthAsync.updateAvailable && healthAsync.updateVersion 
                   ? `${healthAsync.updateVersion} Pending`
                   : 'Vortex is up to date'),
+              healthRow('Deployment Method: ' + healthAsync.activatorType, healthAsync.activatorType === "Hardlinks", healthAsync.activatorType === null),
               healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
               healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),
               healthRow('No Unmanaged Files', !hasUnmanagedFiles,
