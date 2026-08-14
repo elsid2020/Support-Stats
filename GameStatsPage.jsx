@@ -1,6 +1,6 @@
 const React = require('react');
 const { useSelector } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log, Icon } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -178,10 +178,56 @@ function row(label, value) {
 
 function ul(...items) {
   return React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-    ...items.map((text, i) => React.createElement('li', { key: i }, text))
+    ...items.map((text, i) => React.createElement('li', { key: i, dangerouslySetInnerHTML: { __html: text } }))
   );
 }
 
+function StatusIcon({ isOk }) {
+  return React.createElement('svg', {
+    viewBox: '0 0 24 24',
+    style: {
+      width: '14px', height: '14px',
+      fill: isOk ? '#4caf50' : '#f44336',
+      flexShrink: 0, marginRight: '6px', verticalAlign: 'middle'
+    }
+  }, React.createElement('path', { d: isOk ? MDI_CHECK_CIRCLE : MDI_CLOSE_CIRCLE }));
+}
+
+function warningBell() {
+  return React.createElement(Icon, { name: 'notifications', style: { fill: '#e5a50a' } });
+}
+
+function sysRow(label, version, isCurrent) {
+  return React.createElement('div', {
+    style: { display: 'flex', alignItems: 'left', marginBottom: '4px', fontSize: '12px' }
+  },
+    React.createElement(StatusIcon, { isOk: isCurrent }),
+    React.createElement('span', null,
+      label + ': ' + (version || 'Not found')
+    )
+  );
+}
+
+function healthRow(label, isGood, detail, onClick, tooltip) {
+  const icon = isGood
+    ? React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
+    : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✘');
+
+  return React.createElement('div', {
+    style: {
+      display: 'flex', alignItems: 'center', marginBottom: '4px', alignItems: 'flex-start',
+      cursor: onClick ? 'pointer' : 'default',
+    },
+    onClick: onClick || undefined,
+    title: tooltip || undefined,
+  },
+    icon,
+    React.createElement('span', null, label),
+    detail
+      ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
+      : null
+  );
+}
 
 let winapi;
 try { winapi = require('winapi-bindings'); } catch (e) { winapi = null; }
@@ -210,57 +256,37 @@ function isVcppCurrent(version) {
   return major >= 14 && minor >= MIN_VCPP_MINOR;
 }
 
+// Scroll to the faqItems
+function scrollToSection(sectionId) {
+  return () => {
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+      // flash highlight  
+      const originalTransition = el.style.transition;
+      const originalOutline = el.style.outline;
+      const originalOutlineOffset = el.style.outlineOffset;
 
-function StatusIcon({ isOk }) {
-  return React.createElement('svg', {
-    viewBox: '0 0 24 24',
-    style: {
-      width: '14px', height: '14px',
-      fill: isOk ? '#4caf50' : '#f44336',
-      flexShrink: 0, marginRight: '6px', verticalAlign: 'middle'
+      el.style.transition = 'outline-color 0.3s ease';
+      el.style.outline = '3px solid #ffb400';
+      el.style.outlineOffset = '2px';
+
+      setTimeout(() => {
+        el.style.outline = originalOutline;
+        el.style.outlineOffset = originalOutlineOffset;
+        el.style.transition = originalTransition;
+      }, 2000);
+
     }
-  }, React.createElement('path', { d: isOk ? MDI_CHECK_CIRCLE : MDI_CLOSE_CIRCLE }));
+  };
 }
-
-function sysRow(label, version, isCurrent) {
-  return React.createElement('div', {
-    style: { display: 'flex', alignItems: 'left', marginBottom: '4px', fontSize: '12px' }
-  },
-    React.createElement(StatusIcon, { isOk: isCurrent }),
-    React.createElement('span', null,
-      label + ': ' + (version || 'Not found')
-    )
-  );
-}
-
-function healthRow(label, isGood, detail, onClick, tooltip) {
-  const icon = isGood
-    ? React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold' } }, '✔')
-    : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold' } }, '✘');
-
-  return React.createElement('div', {
-    style: {
-      display: 'flex', alignItems: 'center', marginBottom: '4px',
-      cursor: onClick ? 'pointer' : 'default',
-    },
-    onClick: onClick || undefined,
-    title: tooltip || undefined,
-  },
-    icon,
-    React.createElement('span', null, label),
-    detail
-      ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em' } }, detail)
-      : null
-  );
-}
-
 
 // Collapsible FAQ item component  
-function FaqItem({ heading, children }) {
+function FaqItem({ heading, children, id }) {
   const [open, setOpen] = React.useState(false);
 
-  return React.createElement('div', { style: { marginBottom: '8px', border: '1px solid #555', borderRadius: '4px' } },
+  return React.createElement('div', { id, style: { marginBottom: '8px', border: '1px solid #555', borderRadius: '4px' } },
     React.createElement('div', {
       onClick: () => setOpen(!open),
       style: {
@@ -282,69 +308,124 @@ function FaqItem({ heading, children }) {
       : null
   );
 }
+function buildFaqItems(api) {
+  return [
+    {
+      heading: 'Crash to desktop when clicking new game:',
+      content: ul(
+        'Make sure your Vortex is up to date. Restart Vortex and you should receive a notification about a new Vortex version if it is not up to date. If it\'s very old just go to <a href="https://www.nexusmods.com/vortex" target="_blank">https://www.nexusmods.com/vortex</a> and download the latest version.',
+        'Pirated version of the game is installed. Go buy the game. You\'ll find no support otherwise.',
+        'Mods have not been deployed. Do not rely on auto deploy - Simply click on Deploy Mods on the Mods tab in Vortex.',
+        'Plugins are disabled and have not been sorted. Click 1 plugin, then control+a to select all then Enable at the bottom. Then, click on Sort Now on the Plugins tab in Vortex.',
+        'User has extra mods installed. Profiles do not keep mods or collections separate',
+        'Wrong version of the game is installed (VR version, downgraded Special Edition, Original launch version etc.)',
+      ),
+    },
+    {
+      heading: 'Infinite loadscreen on start up:',
+      content: ul(
+        'Make sure your Vortex is up to date. Restart Vortex and you should receive a notification about a new Vortex version if it is not up to date. If it\'s very old just go to <a href="https://www.nexusmods.com/vortex" target="_blank">https://www.nexusmods.com/vortex</a> and download the latest version.',
+        'Plugins are disabled / not sorted. Simply restart Vortex, select one plugin then press Ctrl+A and press Enable at the bottom. Follow that with clicking the Sort Now button at the top.',
+      ),
+    },
+    {
+      heading: 'Can\'t launch via script extender — it\'s grayed out:',
+      content: ul(
+        'Just restarting Vortex may make it work.',
+        'You may have had SKSE before (old version or Steam version) and when you downloaded it again with the collection, Vortex did not know what to do. Simply click on the 3 dots on the side of the script extender, click Edit, and for the Target Path navigate to your Skyrim game folder and select "skse64_loader.exe". Make sure it looks similar to: .....Steam\\steamapps\\common\\Skyrim Special Edition\\skse64_loader.exe',
+      ),
+    },
+    {
+      heading: 'Script extender 000, wrong version error:',
+      content: ul(
+        'You are still trying to open the game from Steam instead of the script extender. You needs to only launch the game using SKSE65 → From Tools or a desktop shortcut that points to the script extender.',
+      ),
+    },
+    {
+      heading: 'SKSE Loader Prompt:',
+      content: ul(
+        'You do not have the latest version of Microsoft Visual C++ Redistributable. Simply install the latest version from the internet. Most users have this but new computers do not come with this software already installed.',
+        'You have pirated software.',
+      ),
+    },
+    {
+      heading: 'No textures or meshes, faces not shown, purple room, only teeth showing etc.:',
+      id: 'notlaunchedthegame',
+      content: ul(
+        'You have not launched & started a new game in Skyrim even once before installing this collection. Purge your mods, and launch Skyrim from Steam and play until Ralof says a sentence or two. Quit the game (no save) and deploy mods, make sure all plugins are enabled and click Sort Now. Enjoy.',
+      ),
+    },
+    {
+      heading: "How do I remove OneDrive?",
+      id: 'removeonedrive',
+      content: ul(
+        'Even if you have previously uninstalled OneDrive, it tends to leave a OneDrive folder in your Documents path. This will interfere with Skyrim. Follow these directions: ',
+        '<a href="https://docs.google.com/document/d/1Ot0l8uFv-AJZr1X6vRMQNovhua_NUtE_HhbkrfJi1Ss/edit?usp=sharing">How do I remove OneDrive?</a>',
+      ),
+    },
+    {
+      heading: 'External / Removeable USB drives',
+      id: 'externaldrive',
+      content: ul(
+        'USB drives have multiple issues that make them unsuitable for modded Skyrim',
+        '1. Even the fastest drives do not have the performance to keep up with the huge amount of file operations in modded Skyrim.',
+        '2. USB drives commonly come pre-formatted to use the exFAT filesystem. This is almost universally usable, but does not support the hardlinks Vortex needs to reliably deploy mods. Reformatting to NTFS would help, but not fix problem #1',
+        'If you are using a USB drive, you need 1) to Purge your mods in Vortex, 2) use Steam to move your game to an internal drive, and 3) use Vortex (Game Settings > Mods) to move your staging folder and files to the same drive you moved Skyrim to.'
+      ),
+    },
+    {
+      heading: 'Failed To Install Dependency:',
+      content: ul(
+        'Make sure your Vortex is up to date. Restart Vortex and you\'ll receive a notification about a new Vortex version if it is not up to date.',
+        'Check the error code by pressing "More" to understand it. 500 is purely a Nexus server error — trying again later should fix it. 501 means you have hit your download quota for the day.',
+        'A read-only file error means you need to restart Vortex as you are trying to reopen the same file.',
+      ),
+    },
+    {
+      heading: 'This Collection Not Being Installed Because It Is Meant For VR:',
+      content: ul(
+        'Update Vortex to the latest version. If this doesn\'t fix it, go to Extensions in Vortex. Disable Skyrim VR. Restart.',
+      ),
+    },
+    {
+      heading: 'FNIS Detected',
+      id: 'removefnis',
+      content: React.createElement(React.Fragment, null,
+        React.createElement('p', null, 'Neither FNIS or Nemesis are used by the collection...'),
+        React.createElement('p', null,
+          '    1. In Vortex goto Skyrim > Game Settings -> ',
+          React.createElement('label', {
+            style: { cursor: 'pointer', textDecoration: 'underline', color: '#3daee9' },
+            onClick: () => {
+              api.events.emit("show-main-page", "game_settings");
 
-const faqItems = [
-  {
-    heading: 'Crash to desktop when clicking new game:',
-    content: ul(
-      'Make sure your Vortex is up to date. Restart Vortex and you should receive a notification about a new Vortex version if it is not up to date. If it\'s very old just go to <a href="https://www.nexusmods.com/vortex" target="_blank">https://www.nexusmods.com/vortex</a> and download the latest version.',
-      'Pirated version of the game is installed. Go buy the game. You\'ll find no support otherwise.',
-      'Mods have not been deployed. Do not rely on auto deploy - Simply click on Deploy Mods on the Mods tab in Vortex.',
-      'Plugins are disabled and have not been sorted. Click 1 plugin, then control+a to select all then Enable at the bottom. Then, click on Sort Now on the Plugins tab in Vortex.',
-      'User has extra mods installed. Profiles do not keep mods or collections separate',
-      'Wrong version of the game is installed (VR version, downgraded Special Edition, Original launch version etc.)',
-    ),
-  },
-  {
-    heading: 'Infinite loadscreen on start up:',
-    content: ul(
-      'Make sure your Vortex is up to date. Restart Vortex and you should receive a notification about a new Vortex version if it is not up to date. If it\'s very old just go to <a href="https://www.nexusmods.com/vortex" target="_blank">https://www.nexusmods.com/vortex</a> and download the latest version.',
-      'Plugins are disabled / not sorted. Simply restart Vortex, select one plugin then press Ctrl+A and press Enable at the bottom. Follow that with clicking the Sort Now button at the top.',
-    ),
-  },
-  {
-    heading: 'Can\'t launch via script extender — it\'s grayed out:',
-    content: ul(
-      'Just restarting Vortex may make it work.',
-      'You may have had SKSE before (old version or Steam version) and when you downloaded it again with the collection, Vortex did not know what to do. Simply click on the 3 dots on the side of the script extender, click Edit, and for the Target Path navigate to your Skyrim game folder and select "skse64_loader.exe". Make sure it looks similar to: .....Steam\\steamapps\\common\\Skyrim Special Edition\\skse64_loader.exe',
-    ),
-  },
-  {
-    heading: 'Script extender 000, wrong version error:',
-    content: ul(
-      'You are still trying to open the game from Steam instead of the script extender. You needs to only launch the game using SKSE65 → From Tools or a desktop shortcut that points to the script extender.',
-    ),
-  },
-  {
-    heading: 'SKSE Loader Prompt:',
-    content: ul(
-      'You do not have the latest version of Microsoft Visual C++ Redistributable. Simply install the latest version from the internet. Most users have this but new computers do not come with this software already installed.',
-      'You have pirated software.',
-    ),
-  },
-  {
-    heading: 'No textures or meshes, faces not shown, purple room, only teeth showing etc.:',
-    content: ul(
-      'You have not launched & started a new game in Skyrim even once before installing this collection. Purge your mods, and launch Skyrim from Steam and play until Ralof says a sentence or two. Quit the game (no save) and enable deploy mods. Fixed. Enjoy.',
-    ),
-  },
-  {
-    heading: 'Failed To Install Dependency:',
-    content: ul(
-      'Make sure your Vortex is up to date. Restart Vortex and you\'ll receive a notification about a new Vortex version if it is not up to date.',
-      'Check the error code by pressing "More" to understand it. 500 is purely a Nexus server error — trying again later should fix it. 501 means you have hit your download quota for the day.',
-      'A read-only file error means you need to restart Vortex as you are trying to reopen the same file.',
-    ),
-  },
-  {
-    heading: 'This Collection Not Being Installed Because It Is Meant For VR:',
-    content: ul(
-      'Update Vortex to the latest version. If this doesn\'t fix it, go to Extensions in Vortex. Disable Skyrim VR. Restart.',
-    ),
-  },
-];
+            },
+          }, 'Interface'),
+          ' Run FNIS on Deployment (Toggle this off!)',
+        ),
+        ul(
+          '2. Then go to mods tab. Disable anything related to FNIS or Nemesis...',
+          '3. Search for "pandora output" and REMOVE IT...',
+          '4. Then either go to Skyrim => Collections tab...',
+          '   Click on the "resume" button...',
+        ),
+      )
+    },
+    {
+      heading: 'Unmanage files found',
+      id: 'unmanagedfiles',
+      content: ul(
+        'Unamanged files are found in your Skyrim Data folder and can interfere with your new collection.',
+        'If you have unmanaged files, these are commonly leftover files from old modding that didn\'t use a mod manager OR',
+        'Improperly installed mods, OR',
+        'Improperly removed mods',
+        '*Exception: By default Bodyslide will put meshes into the Skyrim Data folder. If you haven\'t done this or don\'t know what this means, it doesn\'t apply :).',
+      ),
+    },
 
+  ];
 
+}
 
 
 function openScreenshotTool() {
@@ -398,7 +479,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.5.1";
+  const extensionVersion = "1.5.3";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -421,6 +502,7 @@ function GameStatsPage({ api }) {
     return state?.settings?.gameMode?.discovered?.[gameId] || {};
   });
   const gamePath = gameDiscovery?.path || 'Not discovered';
+  const steamGame = gamePath.toLowerCase().includes('\\steamapps\\common\\skyrim special edition');
   const mods = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
     return state?.persistent?.mods?.[gameId] || {};
@@ -511,6 +593,19 @@ function GameStatsPage({ api }) {
     return undefined;
   }
 
+  function includeWarning(basetext, isOK, optionaltext) {
+    const parts = [basetext];
+
+    if (!isOK) {
+      parts.push(' ', warningBell());
+    }
+
+    if (optionaltext) {
+      parts.push(' ', optionaltext);
+    }
+
+    return React.createElement('span', null, ...parts);
+  }
 
   // --- file-check effect ---
   useEffect(() => {
@@ -1369,6 +1464,7 @@ function GameStatsPage({ api }) {
     );
   }
 
+  const faqItems = buildFaqItems(api);
 
 
   //=========================== Render the page  ==========================================================
@@ -1495,7 +1591,7 @@ function GameStatsPage({ api }) {
                 )),
 
               // row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : `${gameName} (No AE DLC)`),
-              row('Game Path: ', isRemovable ? `${gamePath} (Removable)` : gamePath),
+              row('Game Path: ', includeWarning(gamePath, steamGame, (isRemovable ? '(Removable)' : null))),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
                 React.createElement('strong', null, 'INI Files:'),
@@ -1614,7 +1710,28 @@ function GameStatsPage({ api }) {
               row('Disabled Plugins: ', disabledPlugins.length),
               row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
               row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),
-              row('Unmanaged Files: ',
+              row(
+                React.createElement('span', null,
+                  'Unmanaged Files: ',
+                  React.createElement('span', {
+                    onClick: scrollToSection('unmanagedfiles'), // no arrow-wrapping — same bug as before  
+                    title: 'Jump to FAQ: Unmanaged Files',
+                    style: {
+                      cursor: 'pointer',
+                      marginLeft: '4px',
+                      color: '#4fa3ff',
+                      fontWeight: 'bold',
+                      border: '1px solid #4fa3ff',
+                      borderRadius: '50%',
+                      width: '14px',
+                      height: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.7em',
+                    },
+                  }, '?')
+                ),
                 unmanagedFiles.loading
                   ? 'Scanning...'
                   : React.createElement('div', null,
@@ -1678,68 +1795,128 @@ function GameStatsPage({ api }) {
             marginBottom: '16px',
           }
         },
-          React.createElement('h3', { style: { marginTop: 0, marginBottom: '12px' } }, 'Health Checks'),
-          React.createElement('button', {
-            onClick: () => setRefreshKey(k => k + 1),
-            className: 'btn btn-default btn-xs', style: { marginRight: '6px' }
-          }, 'Refresh'),
           React.createElement('div', {
-            style: { display: 'flex', gap: '32px', justifyContent: 'center' }
+            style: {
+              display: 'flex',
+              // alignItems: 'center',      // vertically align header/button/columns on the same line  
+              flexWrap: 'wrap',          // allow the columns to drop below if there's no room  
+              gap: '12px',
+              marginBottom: '12px',
+            }
           },
-            // Column 1  
-            React.createElement('div', { style: { flex: '0 0 auto' } },
-              healthRow('Mods Deployed', isDeployed, null,
-                () => api.events.emit("show-main-page", "Mods")),
-              healthRow('Plugins Sorted', pluginsSorted, null,
-                () => api.events.emit("show-main-page", "gamebryo-plugins")),
-              healthRow('INI Files Present', gameLaunched, healthAsync.iniPresent === null),
-              healthRow('OneDrive NOT in INI Path', !hasOneDrive, false),
-              healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10), aeDLCInstalled === null
-                ? 'Checking...'
-                : null),
-              healthRow('Not a removable drive', !isRemovable, null),
+            // Left side: header stacked above button  
+            React.createElement('div', {
+              style: {
+                display: 'flex',
+                flexDirection: 'column',
+                marginRight: '16px', // gap between this stack and the columns  
+              }
+            },
+              React.createElement('h3', { style: { width: 'fit-content', marginTop: 0, marginBottom: '8px' } }, 'Health Stats'),
+              React.createElement('button', {
+                onClick: () => setRefreshKey(k => k + 1),
+                className: 'btn btn-default btn-xs',
+                style: { marginBottom: 0, width: 'fit-content' },
+              }, 'Refresh')
             ),
-            // Column 2  
-            React.createElement('div', { style: { flex: '0 0 auto' } },
-              healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
-                healthAsync.updateAvailable === null
+            // Right side: your existing columns div, unchanged  
+            React.createElement('div', {
+              style: {
+                display: 'flex',
+                justifyContent: 'center',
+                flex: 1,
+              }
+            },
+              // Column 1  
+              React.createElement('div', { style: { flex: '0 0 auto' } },
+                healthRow('Mods Deployed', isDeployed, null,
+                  () => api.events.emit("show-main-page", "Mods"), "Jump to Mods tab"),
+                healthRow('Plugins Sorted', pluginsSorted, null,
+                  () => api.events.emit("show-main-page", "gamebryo-plugins"), "Jump to Plugins tab"),
+                healthRow('INI Files Present', gameLaunched, false,
+                  !gameLaunched // && healthAsync.iniPresent === null
+                    ? scrollToSection('notlaunchedthegame')
+                    : null,
+                  !gameLaunched
+                    ? 'You failed to launch the game before you modded it. Click for details.'
+                    : null),
+                healthRow('OneDrive NOT in INI Path', !hasOneDrive, false,
+                  hasOneDrive
+                    ? scrollToSection('removeonedrive')
+                    : null,
+                  hasOneDrive
+                    ? 'OneDrive found. Click to learn how to remove it.'
+                    : null),
+                healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10), aeDLCInstalled === null
                   ? 'Checking...'
-                  : healthAsync.updateAvailable && healthAsync.updateVersion
-                    ? `${healthAsync.updateVersion} Pending`
-                    : 'Vortex is up to date'),
-              healthRow('Deployment Method: ' + healthAsync.activatorType, healthAsync.activatorType === "Hardlinks", healthAsync.activatorType === null),
-              healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
-              healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false),
-              healthRow('No Unmanaged Files', !hasUnmanagedFiles,
-                unmanagedFiles.loading
-                  ? 'Scanning...'
-                  : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
-                hasUnmanagedFiles ? showUnmanagedDialog : null),
-              healthRow('Suppressed Notifications',
-                suppressedCount === 0,
-                suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
-                suppressedCount > 0
-                  ? () => {
-                    suppressedIds.forEach(id =>
-                      api.suppressNotification?.(id, false));
-                    api.events.emit('trigger-test-run', 'gamemode-activated');
-                  }
-                  : null,
-                suppressedCount > 0 ? tooltipText : null)
-            ),
-          )
-        ),
+                  : null),
+                healthRow('Not a removable drive', !isRemovable, null,
+                  isRemovable
+                    ? scrollToSection('externaldrive')
+                    : null,
+                  isRemovable
+                    ? "Removable drives are not suppoted. Click for details"
+                    : null),
+              ),
+              // Column 2  
+              React.createElement('div', { style: { flex: '0 0 auto' } },
+                healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
+                  healthAsync.updateAvailable === null
+                    ? 'Checking...'
+                    : healthAsync.updateAvailable && healthAsync.updateVersion
+                      ? `${healthAsync.updateVersion} Pending`
+                      : 'Vortex is up to date'),
+                healthRow('Deployment Method: ' + healthAsync.activatorType, healthAsync.activatorType === "Hardlinks", null,
+                  () => {
+                    api.events.emit("show-main-page", "game_settings");
+                    api.store.dispatch(actions.setSettingsPage("Mods"))
+                  },
+                  "Open Game Settings"
+                ),
+                healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
+                healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false,
+                  hasFnisOrNemesis
+                    ? scrollToSection('removefnis')
+                    : null,
+                  hasFnisOrNemesis
+                    ? 'FNIS and Nemesis are not used. Click for details.'
+                    : null),
+                healthRow('No Unmanaged Files', !hasUnmanagedFiles,
+                  unmanagedFiles.loading
+                    ? 'Scanning...'
+                    : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
+                  hasUnmanagedFiles
+                    ? showUnmanagedDialog
+                    : null,
+                  hasUnmanagedFiles
+                    ? 'Click here to see a list of unmanaged files'
+                    : null),
+                healthRow('Suppressed Notifications',
+                  suppressedCount === 0,
+                  suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
+                  suppressedCount > 0
+                    ? () => {
+                      suppressedIds.forEach(id =>
+                        api.suppressNotification?.(id, false));
+                      api.events.emit('trigger-test-run', 'gamemode-activated');
+                    }
+                    : null,
+                  suppressedCount > 0 ? tooltipText : null)
+              ),
+            )
+          ),),
         React.createElement('h3', null, 'Troubleshooting'),
         React.createElement('p', { style: { marginBottom: '12px', fontStyle: 'italic' } },
           'Stop. Do not remove or reinstall things on the first error prompt you are seeing. ' +
           'This is not a Commodore 64 — hitting the PC or redoing the same things won\'t result in a different outcome. ' +
           'Most errors you get are explained below. You\'ll be able to solve most of them.'
         ),
+
         ...faqItems.map((item, i) =>
-          React.createElement(FaqItem, { key: i, heading: item.heading }, item.content)
+          React.createElement(FaqItem, { key: i, heading: item.heading, id: item.id }, item.content)
         )
 
-      ))
+      )),
   );
 }
 
