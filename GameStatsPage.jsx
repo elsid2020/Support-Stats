@@ -484,6 +484,7 @@ function GameStatsPage({ api }) {
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
   const gameName = game ? game.name : 'Unknown';
+  
   const { useEffect, useState, useRef } = React;
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
@@ -501,7 +502,10 @@ function GameStatsPage({ api }) {
     const gameId = selectors.activeGameId(state);
     return state?.settings?.gameMode?.discovered?.[gameId] || {};
   });
+  const exeVersion = require('exe-version');  
   const gamePath = gameDiscovery?.path || 'Not discovered';
+  const gameVersion = exeVersion.getProductVersionLocalized(path.join(gamePath, 'SkyrimSE.exe'));
+  
   const steamGame = gamePath.toLowerCase().includes('\\steamapps\\common\\skyrim special edition');
   const mods = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
@@ -1571,7 +1575,7 @@ function GameStatsPage({ api }) {
             React.createElement('div', { style: { flex: '1' } },
               React.createElement('div', { style: { marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } },
                 React.createElement('strong', null, 'Active Game: '),
-                gameName,
+                `${gameName} (${gameVersion})`,
                 React.createElement('label', { style: { display: 'flex', alignItems: 'center' } },
                   React.createElement('input', {
                     type: 'checkbox',
