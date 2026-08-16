@@ -181,6 +181,26 @@ function ul(...items) {
     ...items.map((text, i) => React.createElement('li', { key: i, dangerouslySetInnerHTML: { __html: text } }))
   );
 }
+function moreInfo(infoItem, tooltip) {
+  return React.createElement('span', {
+    onClick: scrollToSection(infoItem), // no arrow-wrapping — same bug as before  
+    title: tooltip,
+    style: {
+      cursor: 'pointer',
+      marginLeft: '0px',
+      color: '#4fa3ff',
+      fontWeight: 'bold',
+      border: '1px solid #4fa3ff',
+      borderRadius: '50%',
+      width: '14px',
+      height: '14px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '0.7em',
+    },
+  }, '?');
+}
 
 function StatusIcon({ isOk }) {
   return React.createElement('svg', {
@@ -193,8 +213,26 @@ function StatusIcon({ isOk }) {
   }, React.createElement('path', { d: isOk ? MDI_CHECK_CIRCLE : MDI_CLOSE_CIRCLE }));
 }
 
-function warningBell() {
-  return React.createElement(Icon, { name: 'notifications', style: { fill: '#e5a50a' } });
+function warningBell(tooltip) {
+  return React.createElement(Icon, {tooltip: tooltip, name: 'notifications', style: { fill: '#e5a50a' }});
+}
+function locked(tooltip) {
+  return React.createElement('span', {title: tooltip },
+    React.createElement(Icon, { name: 'locked', style: { fill: '#4fe50a' }}));
+}
+
+function includeWarning(basetext, isOK, optionaltext) {
+  const parts = [basetext];
+
+  if (!isOK) {
+    parts.push(' ', warningBell());
+  }
+
+  if (optionaltext) {
+    parts.push(' ', optionaltext);
+  }
+
+  return React.createElement('span', null, ...parts);
 }
 
 function sysRow(label, version, isCurrent) {
@@ -233,8 +271,60 @@ let winapi;
 try { winapi = require('winapi-bindings'); } catch (e) { winapi = null; }
 
 
+function getSteamPath() {
+  if (process.env.WINEPREFIX || process.env.WINELOADER) {
+    // Wine host 
+    const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
+    const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
+    return wineResult;
+  } else if ((!process.env.WINEPREFIX || process.env.WINELOADER) && process.platform === 'win32') {
+    // Windows host
+    try {
+      const winapi = require('winapi-bindings');
+      const result = winapi.RegGetValue(
+        'HKEY_CURRENT_USER',
+        'Software\\Valve\\Steam',
+        'SteamPath'
+      );
+      return result.value;
+    } catch (err) {
+      return undefined;
+    }
+  } else {
+    // Linux host paths  
+    const os = require('os');
+    const path = require('path');
+    const fs = require('fs');
+    const home = os.homedir();
+    const candidates = [
+      path.join(home, '.local', 'share', 'Steam'),
+      path.join(home, '.steam', 'debian-installation'),
+      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),
+      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
+      path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam'),
+      path.join(home, '.steam', 'steam'),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync)// (path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
+        return candidate;
+    }
+  }
+  return undefined;
+}
 
+async function isReadOnly(filePath) {
+  try {
+    await fs.access(filePath, fs.constants.W_OK);
+    return false; // writable  
+  } catch (err) {
+    if (err.code === 'EPERM' || err.code === 'EACCES') {
+      return true; // read-only / no write permission  
+    }
+    throw err; // e.g. ENOENT — file doesn't exist, handle separately  
+  }
+}
 
+const steamPath = getSteamPath();
 
 function getVcppVersion(arch) {
   if (!winapi) return null;
@@ -308,7 +398,7 @@ function FaqItem({ heading, children, id }) {
       : null
   );
 }
-function buildFaqItems(api) {
+function buildFaqItems(api, steamPath) {
   return [
     {
       heading: 'Crash to desktop when clicking new game:',
@@ -422,6 +512,37 @@ function buildFaqItems(api) {
         '*Exception: By default Bodyslide will put meshes into the Skyrim Data folder. If you haven\'t done this or don\'t know what this means, it doesn\'t apply :).',
       ),
     },
+    {
+      heading: 'Lock or rollback Skyrim version',
+      id: 'lockversioninfo',
+      content:
+        React.createElement('p', null,
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => util.opn(steamPath.replace(/(\\common\\Skyrim\ Special\ Edition)/gm, '')).catch(() => undefined)
+          }, 'Steam Folder'),
+          ul(
+            'Locking your Skyrim Special Edition(SSE) version will prevent any future SSE updates from breaking the collection.',
+            '<br>',
+            'To <b><i>lock</i></b> your SSE verion, click the button above to open the folder,',
+            'Right click <code>appmanifest489830.acf</code> and select Properties',
+            'Click the <b>Read-only</b> box to check the box and prevent those troublesome updates.',
+            'Click Apply then OK',
+            '<br>',
+            'If you need to roll-back your SSE Version, Press ⊞Win + R (or go to Start > Run) and enter <code>steam://nav/console</code>',
+            '<br>',
+            'These will download the <b>SSE 1.6.1170</b> files:',
+            'download_depot 489830 489831 8442952117333549665',
+            'download_depot 489830 489832 8042843504692938467',
+            'download_depot 489830 489833 1914580699073641964',
+            'for Creaktin Kit:',
+            'download_depot 1946180 1946182 7716046898922594451',
+            'download_depot 1946180 1946183 9161772268289920525',
+            '<br>',
+            'After download the files can be found in D:\\Program Files (x86)\\Steam\\steamapps\\content',
+            'Simply copy/move the files to your SSE folder'
+          ),),
+    },
 
   ];
 
@@ -484,7 +605,7 @@ function GameStatsPage({ api }) {
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
   const gameName = game ? game.name : 'Unknown';
-  
+
   const { useEffect, useState, useRef } = React;
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
@@ -502,10 +623,10 @@ function GameStatsPage({ api }) {
     const gameId = selectors.activeGameId(state);
     return state?.settings?.gameMode?.discovered?.[gameId] || {};
   });
-  const exeVersion = require('exe-version');  
+  const exeVersion = require('exe-version');
   const gamePath = gameDiscovery?.path || 'Not discovered';
   const gameVersion = exeVersion.getProductVersionLocalized(path.join(gamePath, 'SkyrimSE.exe'));
-  
+
   const steamGame = gamePath.toLowerCase().includes('\\steamapps\\common\\skyrim special edition');
   const mods = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
@@ -556,65 +677,30 @@ function GameStatsPage({ api }) {
         nativeCount > 10 ? 'partial' :
           null; // pluginList not loaded yet
 
-  function getSteamPath() {
-    if (process.env.WINEPREFIX || process.env.WINELOADER) {
-      // Wine host 
-      const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
-      const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
-      return wineResult;
-    } else if ((!process.env.WINEPREFIX || process.env.WINELOADER) && process.platform === 'win32') {
-      // Windows host
-      try {
-        const winapi = require('winapi-bindings');
-        const result = winapi.RegGetValue(
-          'HKEY_CURRENT_USER',
-          'Software\\Valve\\Steam',
-          'SteamPath'
-        );
-        return result.value;
-      } catch (err) {
-        return undefined;
-      }
-    } else {
-      // Linux host paths  
-      const os = require('os');
-      const path = require('path');
-      const fs = require('fs');
-      const home = os.homedir();
-      const candidates = [
-        path.join(home, '.local', 'share', 'Steam'),
-        path.join(home, '.steam', 'debian-installation'),
-        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),
-        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
-        path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam'),
-        path.join(home, '.steam', 'steam'),
-      ];
-      for (const candidate of candidates) {
-        if (fs.existsSync)// (path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
-          return candidate;
-      }
-    }
-    return undefined;
-  }
 
-  function includeWarning(basetext, isOK, optionaltext) {
-    const parts = [basetext];
 
-    if (!isOK) {
-      parts.push(' ', warningBell());
-    }
 
-    if (optionaltext) {
-      parts.push(' ', optionaltext);
-    }
+  const acfPath = path.join(gamePath.replace(/(\\common\\Skyrim\ Special\ Edition)/gm, ''), 'appmanifest_489830.acf')
 
-    return React.createElement('span', null, ...parts);
-  }
+  const [skyrimVersionLocked, setSkyrimVerionLocked] = React.useState(null);
 
-  // --- file-check effect ---
+  // --- read-only skyrim check ---
   useEffect(() => {
     let cancelled = false;
+    (async () => {
+      try {
+        await nodeFs.promises.access(acfPath, nodeFs.constants.W_OK);
+        if (!cancelled) setSkyrimVerionLocked(false);
+      } catch (err) {
+        if (!cancelled) setSkyrimVerionLocked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
 
+  // ----- check for ae dlc ownership --- 
+  useEffect(() => {
+    let cancelled = false;
     function extractBracedSection(text, key) {
       // depth-aware brace matching instead of a naive regex
       const keyIdx = text.search(new RegExp(`"${key}"\\s*\\{`, 'i'));
@@ -643,7 +729,7 @@ function GameStatsPage({ api }) {
       if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwnedManual: false }));
 
       try {
-        const steamPath = getSteamPath();
+        // const steamPath = getSteamPath();
         if (!steamPath) {
           if (!cancelled) setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));
           return;
@@ -1468,7 +1554,7 @@ function GameStatsPage({ api }) {
     );
   }
 
-  const faqItems = buildFaqItems(api);
+  const faqItems = buildFaqItems(api, gamePath);
 
 
   //=========================== Render the page  ==========================================================
@@ -1576,6 +1662,10 @@ function GameStatsPage({ api }) {
               React.createElement('div', { style: { marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } },
                 React.createElement('strong', null, 'Active Game: '),
                 `${gameName} (${gameVersion})`,
+                skyrimVersionLocked
+                  ? locked('Skyrim version locked')
+                  : null,
+                moreInfo('lockversioninfo', 'Game version tips'),
                 React.createElement('label', { style: { display: 'flex', alignItems: 'center' } },
                   React.createElement('input', {
                     type: 'checkbox',
@@ -1593,8 +1683,6 @@ function GameStatsPage({ api }) {
                     }, healthAsync.aeDLCOwnedManual ? '(manual)' : '(auto)')
                   )
                 )),
-
-              // row('Active Game: ', healthAsync.aeDLCOwned === true ? `${gameName} (with AE DLC)` : `${gameName} (No AE DLC)`),
               row('Game Path: ', includeWarning(gamePath, steamGame, (isRemovable ? '(Removable)' : null))),
               row('Staging Folder: ', stagingPath || 'Not configured'),
               React.createElement('div', { style: { marginBottom: '10px' } },
@@ -1717,24 +1805,7 @@ function GameStatsPage({ api }) {
               row(
                 React.createElement('span', null,
                   'Unmanaged Files: ',
-                  React.createElement('span', {
-                    onClick: scrollToSection('unmanagedfiles'), // no arrow-wrapping — same bug as before  
-                    title: 'Jump to FAQ: Unmanaged Files',
-                    style: {
-                      cursor: 'pointer',
-                      marginLeft: '4px',
-                      color: '#4fa3ff',
-                      fontWeight: 'bold',
-                      border: '1px solid #4fa3ff',
-                      borderRadius: '50%',
-                      width: '14px',
-                      height: '14px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.7em',
-                    },
-                  }, '?')
+                  moreInfo('unmanagedfiles', 'More info'),
                 ),
                 unmanagedFiles.loading
                   ? 'Scanning...'
