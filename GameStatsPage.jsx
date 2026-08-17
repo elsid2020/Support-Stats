@@ -1,10 +1,10 @@
 const React = require('react');
 const { useSelector } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log, Icon } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log, Icon, IconButton } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
-const { shell } = require('electron');
+const { shell, clipboard } = require('electron');
 const { exec, execFile } = require('child_process');
 const { count } = require('console');
 const { json } = require('stream/consumers');
@@ -187,7 +187,7 @@ function moreInfo(infoItem, tooltip) {
     title: tooltip,
     style: {
       cursor: 'pointer',
-      marginLeft: '0px',
+      // marginLeft: '-4px',
       color: '#4fa3ff',
       fontWeight: 'bold',
       border: '1px solid #4fa3ff',
@@ -216,9 +216,9 @@ function StatusIcon({ isOk }) {
 function warningBell(tooltip) {
   return React.createElement(Icon, {tooltip: tooltip, name: 'notifications', style: { fill: '#e5a50a' }});
 }
-function locked(tooltip) {
-  return React.createElement('span', {title: tooltip },
-    React.createElement(Icon, { name: 'locked', style: { fill: '#4fe50a' }}));
+function locked(status, tooltip) {
+  return React.createElement('span', {title: tooltip, style: { marginLeft: '-5px' } },
+    React.createElement(Icon, { name: status ? 'locked' : 'unlocked', style: { fill: status ? '#4fe50a' : '#db3e3e' } }));
 }
 
 function includeWarning(basetext, isOK, optionaltext) {
@@ -265,6 +265,20 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
       ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
       : null
   );
+}
+
+
+  
+function copyButton(text, tooltip) {  
+  return React.createElement('span', { title: tooltip || 'Copy to clipboard', style: { cursor: 'pointer', marginLeft: '6px' } },  
+    React.createElement('button', {  
+      className: 'btn-embed',  
+      style: { background: 'none', border: 'none', padding: 0 },  
+      onClick: () => require('electron').clipboard.writeText(text),  
+    },  
+      React.createElement(Icon, { name: 'clipboard-copy' })  
+    )  
+  );  
 }
 
 let winapi;
@@ -398,7 +412,7 @@ function FaqItem({ heading, children, id }) {
       : null
   );
 }
-function buildFaqItems(api, steamPath) {
+function buildFaqItems(api, gamePath) {
   return [
     {
       heading: 'Crash to desktop when clicking new game:',
@@ -439,7 +453,7 @@ function buildFaqItems(api, steamPath) {
       ),
     },
     {
-      heading: 'No textures or meshes, faces not shown, purple room, only teeth showing etc.:',
+      heading: 'INI Files missing OR No textures or meshes, faces not shown, purple room, only teeth showing etc.:',
       id: 'notlaunchedthegame',
       content: ul(
         'You have not launched & started a new game in Skyrim even once before installing this collection. Purge your mods, and launch Skyrim from Steam and play until Ralof says a sentence or two. Quit the game (no save) and deploy mods, make sure all plugins are enabled and click Sort Now. Enjoy.',
@@ -519,28 +533,28 @@ function buildFaqItems(api, steamPath) {
         React.createElement('p', null,
           React.createElement('button', {
             className: 'btn btn-default',
-            onClick: () => util.opn(steamPath.replace(/(\\common\\Skyrim\ Special\ Edition)/gm, '')).catch(() => undefined)
+            onClick: () => util.opn(gamePath.replace(/(\\common\\Skyrim\ Special\ Edition)/gm, '')).catch(() => undefined)
           }, 'Steam Folder'),
           ul(
             'Locking your Skyrim Special Edition(SSE) version will prevent any future SSE updates from breaking the collection.',
             '<br>',
             'To <b><i>lock</i></b> your SSE verion, click the button above to open the folder,',
-            'Right click <code>appmanifest489830.acf</code> and select Properties',
+            'Right click <code>appmanifest_489830.acf</code> and select Properties',
             'Click the <b>Read-only</b> box to check the box and prevent those troublesome updates.',
             'Click Apply then OK',
             '<br>',
             'If you need to roll-back your SSE Version, Press ⊞Win + R (or go to Start > Run) and enter <code>steam://nav/console</code>',
             '<br>',
-            'These will download the <b>SSE 1.6.1170</b> files:',
-            'download_depot 489830 489831 8442952117333549665',
-            'download_depot 489830 489832 8042843504692938467',
-            'download_depot 489830 489833 1914580699073641964',
-            'for Creaktin Kit:',
-            'download_depot 1946180 1946182 7716046898922594451',
-            'download_depot 1946180 1946183 9161772268289920525',
-            '<br>',
-            'After download the files can be found in D:\\Program Files (x86)\\Steam\\steamapps\\content',
-            'Simply copy/move the files to your SSE folder'
+            'These will download the <b>SSE 1.6.1170</b> files:'),
+            React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489831 8442952117333549665', copyButton('download_depot 489830 489831 844295211733354966')),
+            React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'} }, 'download_depot 489830 489832 8042843504692938467', copyButton('download_depot 489830 489832 8042843504692938467')),
+            React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'} }, 'download_depot 489830 489833 1914580699073641964', copyButton('download_depot 489830 489833 1914580699073641964')),
+            ul('for Creation Kit:',),
+            React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'} }, 'download_depot 1946180 1946182 7716046898922594451', copyButton('download_depot 1946180 1946182 7716046898922594451')),
+            React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'} }, 'download_depot 1946180 1946183 9161772268289920525', copyButton('download_depot 1946180 1946183 9161772268289920525')),
+            ul('<br>',
+            'After download the files can be found in SSE Steam path under \\steam\\steamapps\\content\\app_489830',
+            `Simply copy/move the files to ${gamePath}`
           ),),
     },
 
@@ -1661,11 +1675,11 @@ function GameStatsPage({ api }) {
             React.createElement('div', { style: { flex: '1' } },
               React.createElement('div', { style: { marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } },
                 React.createElement('strong', null, 'Active Game: '),
-                `${gameName} (${gameVersion})`,
-                skyrimVersionLocked
-                  ? locked('Skyrim version locked')
+                `${gameName} (${gameVersion}`,
+                skyrimVersionLocked !== null
+                  ? React.createElement('span', { style: { marginBottom: '5px', marginLeft: '0px', marginRight: '0px' } }, locked(skyrimVersionLocked, skyrimVersionLocked ? 'Skyrim version locked' : 'Skyrim version unlocked') )
                   : null,
-                moreInfo('lockversioninfo', 'Game version tips'),
+                React.createElement('span', { style: { marginBottom: '5px', marginLeft: '-3px'}}, moreInfo('lockversioninfo', 'Game version tips'), ' )'),
                 React.createElement('label', { style: { display: 'flex', alignItems: 'center' } },
                   React.createElement('input', {
                     type: 'checkbox',
@@ -1700,14 +1714,16 @@ function GameStatsPage({ api }) {
                     ? React.createElement('div', { style: { marginBottom: '4px' } },
                       React.createElement('strong', null, 'SKSE: '),
                       xseExistsAtExpected
-                        ? React.createElement('span', {
+                        ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(expectedXsePath))
+
+                       /* ? React.createElement('span', {
                           style: { cursor: 'pointer', opacity: 0.8 },
                           title: 'Click to copy path',
-                          onClick: () => {
+                          onClick: () => { 
                             navigator.clipboard.writeText(expectedXsePath);
                             api.sendNotification({ type: 'success', message: 'SKSE path copied', displayMS: 2000 });
                           }
-                        }, expectedXsePath)
+                        }, expectedXsePath) */
                         : React.createElement('span', { style: { opacity: 0.6 } }, 'Not found'),
                       xseStatus === 'hidden'
                         ? React.createElement('span', {
@@ -1922,9 +1938,12 @@ function GameStatsPage({ api }) {
                   hasOneDrive
                     ? 'OneDrive found. Click to learn how to remove it.'
                     : null),
-                healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10), aeDLCInstalled === null
-                  ? 'Checking...'
-                  : null),
+                healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10), 
+                  aeDLCInstalled === null
+                    ? 'Checking...'
+                    : null, 
+                  null,
+                  'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
                 healthRow('Not a removable drive', !isRemovable, null,
                   isRemovable
                     ? scrollToSection('externaldrive')
@@ -1934,7 +1953,7 @@ function GameStatsPage({ api }) {
                     : null),
               ),
               // Column 2  
-              React.createElement('div', { style: { flex: '0 0 auto' } },
+              React.createElement('div', { style: { flex: '0 0 auto', marginLeft: '30px' } },
                 healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
                   healthAsync.updateAvailable === null
                     ? 'Checking...'
