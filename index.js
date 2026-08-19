@@ -1,68 +1,35 @@
 const React = require('react'); 
 const { util, types, selectors, actions } = require('vortex-api');  
 const GameStatsPage = require('./GameStatsPage.jsx'); 
+// const SettingsImmersiveSupport = GameStatsPage.SettingsImmersiveSupport;
+const isAutoOpenEnabled = GameStatsPage.isAutoOpenEnabled;
+
 const path = require('path'); 
 const iaIconPath = 'M16.5 0a8 8 0 0 1 .1 6.7C16.6 8 15 9 14 8.8l.3.3q0 .3.3.5l.3.3.1.2.1.2q.2.6-.3.2l-.1-.1-.2-.3-.2-.3-.3-.4-.3-.3-.2-.3-.2-.2-.2-.2V8q-.7-.2-1.2.6c-.7.5-2 1-1.9 1.9h.1l.1.3.1.1.2.3v.1l.2.3.5.7.3.3.1.4.2.2v.1q.3.7-.3.3l-.1-.2-.1-.2-.2-.4-.2-.3-.2-.3-.3-.4-.2-.3a7 7 0 0 1-1.5 2.6 9 9 0 0 1-3.6.3q-2-.4-3.4-2c-.7-.3-1.8-2-1.7-.4s.9 2.6 1.7 3.7c.9 1.2 1.8 2.6 3.4 2.7l3.8.5h.2l.2-.1h.1l.7-.1.4-.2 2.8-1.3 1-.7.5-.4.4-.4.4-.4.4-.3.5-.5.5-.4.6-.5.6-.5.5-.5.4-.4.4-.3.5-.5V11l.2-.1v-.1l.2-.2q-.6-.4-.5-1.3.3-2.6-.1-5.2l-2-3zm4.3 11h-.2v.2l-.2.2-.1.1-.2.2-.3.4q-.3 0-.4.3l-.4.4-.6.5-.6.5-.5.5-.5.4-.5.5-.4.3-.4.4-.4.4-1.6 1.2-2.8 1.3-.5.2h-.5l-.5.1H9q-.1 2.2.1 4.3c1.4 0 2.6-.7 3.8-1q2.3-1 4.4-2.4l3.6-3q1.5-1.1 2.3-3c.8-.9.2-2-.9-2.2zm-.3 2.4h.2l.4.2.2.1.2.3-.1.4-.4.4-.1.1h-.5q-.3 0-.5-.3l-.1-.1v-.3l.4-.6zm0 .4q-.2 0-.2.2l-.1.2.4.2h.2l.3-.3V14l-.2-.2zm-4 3h.6l.2.1.1.4v.1l-.1.6-.2.2-.4.2H16q-.3 0-.5-.2l-.2-.4.2-.9q.2-.3.4 0v-.1h.4m0 .3H16q-.1.3-.3.1v.8h.7l.2-.1.1-.1.1-.5-.1-.1zm-4.9 2.3h.5l.3.3.2.4v.5l-.4.4h-1l-.3-.4v-.8l.3-.2zm.2.3-.2.1-.2.1-.1.2v.5h.8v-.2l.1-.2-.1-.2-.2-.2z';
 // const iaIconPath = 'M 20.232 16.2 L 18.144 17.04 L 16.272 12.24 L 8.496 12.24 L 6.624 16.992 L 4.68 16.2 L 11.256 0 L 13.752 0 L 20.232 16.2 Z M 2.28 16.8 L 0 16.8 L 0 0 L 2.28 0 L 2.28 16.8 Z M 12.384 2.256 L 15.528 10.32 L 9.216 10.32 L 12.384 2.256 Z'; // spells IA - example - replace with your actual path data 
 const SUPPORTED_GAMES = ['skyrimse'];  
 
-/* const { createAction } = require('redux-act');  
-  
-// Define your action  
-const setPluginsSorted = createAction('SET_PLUGINS_SORTED', (value) => value);  
-  
-// Register a reducer to store the flag persistently  
-context.registerReducer(['persistent', 'immersiveSupport'], {  
-  reducers: {  
-    [setPluginsSorted]: (state, payload) => ({ ...state, pluginsSorted: payload }),  
-  },  
-  defaults: {  
-    pluginsSorted: false,  
-  },  
-});  
-  
-// In context.once(), listen for the event  
-context.once(() => {  
-  context.api.events.on('autosort-plugins', (manual, callback) => {  
-    // manual === true means Sort Now was clicked  
-    // manual === false means auto-sort triggered  
-    // Either way, plugins are being sorted — set the flag  
-    context.api.store.dispatch(setPluginsSorted(true));  
-  });  
-});
-
-// Without redux-act:  
-const SET_PLUGINS_SORTED = 'SET_PLUGINS_SORTED';  
-  
-context.registerReducer(['persistent', 'immersiveSupport'], {  
-  reducers: {  
-    [SET_PLUGINS_SORTED]: (state, payload) => ({ ...state, pluginsSorted: payload.value }),  
-  },  
-  defaults: { pluginsSorted: false },  
-});  
-  
-// Dispatch:  
-context.api.store.dispatch({ type: SET_PLUGINS_SORTED, payload: { value: true } });
-*/
- 
 function init(context) {  
 
   context.registerReducer(['persistent', 'immersiveSupport'], {  
-      reducers: {  
-        SET_PLUGINS_SORTED: (state, payload) => ({ ...state, pluginsSorted: payload.value }), 
-        IMMERSIVE_SET_WELCOME_SEEN: (state, payload) => ({ ...state, welcomeSeen: payload }), 
-      },  
-      defaults: { 
-        pluginsSorted: false,
-        welcomeSeen: false
-      },  
-    });  
+  reducers: {  
+    SET_PLUGINS_SORTED: (state, payload) => ({ ...state, pluginsSorted: payload.value }),  
+    SET_WELCOME_SEEN: (state, payload) => ({ ...state, welcomeSeen: payload }),  
+    SET_AUTO_OPEN: (state, payload) => ({ ...state, autoOpenEnabled: payload.value }),  
+  },  
+  defaults: {  
+    pluginsSorted: false,  
+    welcomeSeen: false,  
+    autoOpenEnabled: true, // enabled by default  
+  },  
+});
+
   context.once(() => {  
   util.installIconSet('game-stats', path.join(__dirname, 'icon.svg'));  
 });
 
   context.registerMainPage('helmet', 'Immersive Support', GameStatsPage, {  
-    priority: 25,  
+    priority: 999,  
     hotkey: 'I',  
     group: 'per-game',
 	  mdi: iaIconPath,
@@ -77,28 +44,52 @@ function init(context) {
     }),  
   });  
   
-  context.once(() => {  
-    context.api.events.on('autosort-plugins', (manual) => {  
-      if (manual) {  
-        context.api.store.dispatch({  
-          type: 'SET_PLUGINS_SORTED',  
-          payload: { value: true },  
-        });  
-      }  
-    });  
-    
+  context.once(() => {
+    context.api.events.on('autosort-plugins', (manual) => {
+      if (manual) {
+        context.api.store.dispatch({
+          type: 'SET_PLUGINS_SORTED',
+          payload: { value: true },
+        });
+    }
+    });
+    });
+        
     // Optional: reset the flag when mods are deployed (user should re-sort)  
     context.api.events.on('did-deploy', () => {  
       context.api.store.dispatch({  
         type: 'SET_PLUGINS_SORTED',  
         payload: { value: false },  
       });  
-    });  
-  });
+    });
+    
+    context.once(() => {
+      context.api.onStateChange(['settings', 'profiles', 'activeProfileId'], () => {
+        const state = context.api.store.getState();
+        if (selectors.activeGameId(state) === 'skyrimse') {
+          context.api.store.dispatch(actions.setOpenMainPage('Immersive Support', false));
+        }
+      });
+    });
+
+  context.once(() => {  
+  context.api.events.on('startup', () => {  
+    const state = context.api.store.getState();  
+    if (selectors.activeGameId(state) === 'skyrimse' && isAutoOpenEnabled(state)) {  
+      context.api.store.dispatch(actions.setOpenMainPage('Immersive Support', false));  
+    }  
+  });  
+});
+
+    
+// context.registerSettings('Interface', SettingsImmersiveSupport, undefined, undefined, 50);
+
+  
   
   return true;  
 }  
-  
+
+
 module.exports = {  
   default: init,  
 };

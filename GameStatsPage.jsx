@@ -1,6 +1,6 @@
 const React = require('react');
-const { useSelector } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log, Icon, IconButton } = require('vortex-api');
+const { useSelector, useDispatch } = require('react-redux');
+const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -116,6 +116,7 @@ function readPluginLightFlag(filePath) {
 }
 
 // MDI icon paths (hardcoded to avoid ES module import issues)  
+const MDI_CHEVRON_DOUBLE_RIGHT = 'M5.59,7.41L7,6L13,12L7,18L5.59,16.59L10.17,12L5.59,7.41M11.59,7.41L13,6L19,12L13,18L11.59,16.59L16.17,12L11.59,7.41Z'
 const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
 const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';
 const discordIconPath = "M19.4308 5.26368C18.1561 4.67878 16.7892 4.24785 15.3599 4.00104C15.3339 3.99627 15.3079 4.00818 15.2945 4.03198C15.1187 4.34466 14.9239 4.75258 14.7876 5.0732C13.2503 4.84306 11.721 4.84306 10.2153 5.0732C10.0789 4.74545 9.87707 4.34466 9.70048 4.03198C9.68707 4.00897 9.66107 3.99707 9.63504 4.00104C8.20659 4.24706 6.83963 4.67799 5.56411 5.26368C5.55307 5.26844 5.54361 5.27638 5.53732 5.28669C2.94449 9.16032 2.23421 12.9387 2.58265 16.6703C2.58423 16.6886 2.59447 16.706 2.60867 16.7171C4.31934 17.9734 5.97642 18.7361 7.60273 19.2416C7.62876 19.2496 7.65634 19.24 7.6729 19.2186C8.05761 18.6933 8.40054 18.1393 8.69456 17.5568C8.71192 17.5227 8.69535 17.4822 8.65989 17.4687C8.11594 17.2624 7.598 17.0108 7.09977 16.7251C7.06037 16.7021 7.05721 16.6457 7.09347 16.6187C7.19831 16.5402 7.30318 16.4584 7.4033 16.3759C7.42141 16.3608 7.44665 16.3576 7.46794 16.3671C10.7411 17.8615 14.2846 17.8615 17.5191 16.3671C17.5404 16.3568 17.5657 16.36 17.5846 16.3751C17.6847 16.4576 17.7895 16.5402 17.8952 16.6187C17.9314 16.6457 17.9291 16.7021 17.8897 16.7251C17.3914 17.0163 16.8735 17.2624 16.3288 17.4679C16.2933 17.4814 16.2775 17.5227 16.2949 17.5568C16.5952 18.1385 16.9381 18.6924 17.3157 19.2178C17.3315 19.24 17.3599 19.2496 17.3859 19.2416C19.0201 18.7361 20.6772 17.9734 22.3879 16.7171C22.4028 16.706 22.4123 16.6894 22.4139 16.6711C22.8309 12.357 21.7154 8.60956 19.4568 5.28748C19.4513 5.27638 19.4419 5.26844 19.4308 5.26368ZM9.18335 14.3982C8.19792 14.3982 7.38594 13.4935 7.38594 12.3824C7.38594 11.2713 8.18217 10.3666 9.18335 10.3666C10.1924 10.3666 10.9965 11.2793 10.9807 12.3824C10.9807 13.4935 10.1845 14.3982 9.18335 14.3982ZM15.829 14.3982C14.8435 14.3982 14.0316 13.4935 14.0316 12.3824C14.0316 11.2713 14.8278 10.3666 15.829 10.3666C16.838 10.3666 17.6421 11.2793 17.6264 12.3824C17.6264 13.4935 16.838 14.3982 15.829 14.3982Z";
@@ -202,7 +203,7 @@ function moreInfo(infoItem, tooltip) {
   }, '?');
 }
 
-function StatusIcon({ isOk }) {
+function statusIcon({ isOk }) {
   return React.createElement('svg', {
     viewBox: '0 0 24 24',
     style: {
@@ -210,7 +211,7 @@ function StatusIcon({ isOk }) {
       fill: isOk ? '#4caf50' : '#f44336',
       flexShrink: 0, marginRight: '6px', verticalAlign: 'middle'
     }
-  }, React.createElement('path', { d: isOk ? MDI_CHECK_CIRCLE : MDI_CLOSE_CIRCLE }));
+  }, React.createElement('path', { d: !isOk ? MDI_CHEVRON_DOUBLE_RIGHT : null }));
 }
 
 function warningBell(tooltip) {
@@ -251,19 +252,39 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
     ? React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
     : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✘');
 
-  return React.createElement('div', {
-    style: {
-      display: 'flex', alignItems: 'center', marginBottom: '4px', alignItems: 'flex-start',
-      cursor: onClick ? 'pointer' : 'default',
-    },
-    onClick: onClick || undefined,
-    title: tooltip || undefined,
-  },
+return React.createElement('div', {  
+    style: {  
+      display: 'flex', alignItems: 'flex-start', marginBottom: '4px',  
+      cursor: onClick ? 'pointer' : 'default',  
+      borderRadius: '4px',  
+      padding: '2px 4px',  
+      transition: 'background-color 0.15s ease',  
+    },  
+    onClick: onClick || undefined,  
+    title: tooltip || undefined,  
+    onMouseEnter: onClick  
+      ? (e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }  
+      : undefined,  
+    onMouseLeave: onClick  
+      ? (e) => { e.currentTarget.style.backgroundColor = 'transparent'; }  
+      : undefined,  
+  },  
     icon,
     React.createElement('span', null, label),
     detail
       ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
-      : null
+      : null,
+    !isGood
+      ? React.createElement('svg', {
+          viewBox: '0 0 24 24',
+          style: {
+            width: '18px', height: '18px',
+            fill: '#f44336',
+            flexShrink: 0, marginRight: '6px', verticalAlign: 'middle',
+            marginBottom: '-3px'
+          }
+          }, React.createElement('path', { d: MDI_CHEVRON_DOUBLE_RIGHT }))
+      : null      
   );
 }
 
@@ -554,13 +575,31 @@ function buildFaqItems(api, gamePath) {
             React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'} }, 'download_depot 1946180 1946183 9161772268289920525', copyButton('download_depot 1946180 1946183 9161772268289920525')),
             ul('<br>',
             'After download the files can be found in SSE Steam path under \\steam\\steamapps\\content\\app_489830',
-            `Simply copy/move the files to ${gamePath}`
+            `Simply copy/move the files to your SSE folder`
           ),),
     },
 
   ];
 
 }
+
+/*
+function SettingsImmersiveSupport({ api }) {  
+  const dispatch = useDispatch();  
+  const enabled = useSelector(isAutoOpenEnabled);  
+  
+  const onToggle = () => {  
+    dispatch({ type: 'SET_AUTO_OPEN', payload: { value: !enabled } });  
+  };  
+  
+  return React.createElement('form', null,  
+    React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open Immersive Support on startup')  
+  );  
+}  */
+  
+function isAutoOpenEnabled(state) {  
+  return state.persistent?.immersiveSupport?.autoOpenEnabled ?? true;  
+}  
 
 
 function openScreenshotTool() {
@@ -653,6 +692,7 @@ function GameStatsPage({ api }) {
     return displayPath(rawPath || 'Not discovered');
   });
 
+
   const knownActivators = {
     'symlink_activator': 'Symlinks',
     'hardlink_activator': 'Hardlinks',
@@ -663,6 +703,9 @@ function GameStatsPage({ api }) {
     const gameId = selectors.activeGameId(state);
     return state?.settings?.mods?.activator[gameId] || 'unknown';
   });
+
+  const enabled = useSelector(isAutoOpenEnabled);  
+  const onToggle = () => dispatch({ type: 'SET_AUTO_OPEN', payload: { value: !enabled } });
 
   const deploymentMethodLabel = activatorId
     ? (knownActivators[activatorId] ?? activatorId)   // fallback to raw id if unmapped  
@@ -1054,7 +1097,7 @@ function GameStatsPage({ api }) {
 
   const hasShownWelcome = useRef(false);
   const welcomeSeen = useSelector(state => state?.settings?.immersiveSupport?.welcomeSeen ?? false);
-  const dispatch = require('react-redux').useDispatch();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     if (!welcomeSeen && isImmersiveCollectionEnabled && !hasShownWelcome.current) {
@@ -1108,7 +1151,7 @@ function GameStatsPage({ api }) {
       'game-stats-welcome'
     ).then((result) => {
       if (result.input['dont_show_again']) {
-        const dismissWelcome = () => dispatch({ type: 'IMMERSIVE_SET_WELCOME_SEEN', payload: true });
+        const dismissWelcome = () => dispatch({ type: 'SET_WELCOME_SEEN', payload: true });
 
       }
     });
@@ -1553,7 +1596,7 @@ function GameStatsPage({ api }) {
 
     api.showDialog(
       'info',
-      'Unmanaged Files (hardlink count \u2264 1)',
+      `Unmanaged Files in ${gamePath}\\Data`,
       {
         htmlText: '<style>'
           + '#game-stats-unmanaged { display: flex !important; align-items: center; }'
@@ -1569,7 +1612,7 @@ function GameStatsPage({ api }) {
   }
 
   const faqItems = buildFaqItems(api, gamePath);
-
+  
 
   //=========================== Render the page  ==========================================================
 
@@ -1619,7 +1662,13 @@ function GameStatsPage({ api }) {
           className: 'btn btn-default',
           onClick: showWelcomeDialog
         }, 'Welcome'),
-      )
+        React.createElement('div', { style: { marginBottom: '-6px' } }, 
+          React.createElement('span', { title: 'Make Immersive Support the default tab' },  
+            React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')  
+          ), 
+        ),
+    ),
+      
     ),
     React.createElement(MainPage.Body, null,
       React.createElement('div', { style: { padding: '20px', overflowY: 'auto', height: '100%' } },
@@ -1716,15 +1765,17 @@ function GameStatsPage({ api }) {
                       xseExistsAtExpected
                         ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(expectedXsePath))
 
-                       /* ? React.createElement('span', {
-                          style: { cursor: 'pointer', opacity: 0.8 },
-                          title: 'Click to copy path',
-                          onClick: () => { 
-                            navigator.clipboard.writeText(expectedXsePath);
-                            api.sendNotification({ type: 'success', message: 'SKSE path copied', displayMS: 2000 });
-                          }
-                        }, expectedXsePath) */
-                        : React.createElement('span', { style: { opacity: 0.6 } }, 'Not found'),
+                        /* ? React.createElement('span', {
+                           style: { cursor: 'pointer', opacity: 0.8 },
+                           title: 'Click to copy path',
+                           onClick: () => { 
+                             navigator.clipboard.writeText(expectedXsePath);
+                             api.sendNotification({ type: 'success', message: 'SKSE path copied', displayMS: 2000 });
+                           }
+                         }, expectedXsePath) */
+                        : xseExistsAtStored
+                          ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(xseTool.path))
+                          : React.createElement('span', { style: { opacity: 0.6 } }, 'Not found'),
                       xseStatus === 'hidden'
                         ? React.createElement('span', {
                           style: {
@@ -1961,13 +2012,16 @@ function GameStatsPage({ api }) {
                       ? `${healthAsync.updateVersion} Pending`
                       : 'Vortex is up to date'),
                 healthRow('Deployment Method: ' + healthAsync.activatorType, healthAsync.activatorType === "Hardlinks", null,
-                  () => {
+                  healthAsync.activatorType !== "Hardlinks"
+                  ? () => {
                     api.events.emit("show-main-page", "game_settings");
-                    api.store.dispatch(actions.setSettingsPage("Mods"))
-                  },
+                    api.store.dispatch(actions.setSettingsPage("Mods")) }
+                  : null,
                   "Open Game Settings"
                 ),
-                healthRow('SKSE64 is Default Launcher', isXsePrimary, false),
+                healthRow('SKSE64 is Default Launcher', isXsePrimary, false,
+
+                ),
                 healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false,
                   hasFnisOrNemesis
                     ? scrollToSection('removefnis')
@@ -2015,3 +2069,5 @@ function GameStatsPage({ api }) {
 }
 
 module.exports = GameStatsPage;
+/// module.exports.SettingsImmersiveSupport = SettingsImmersiveSupport;
+module.exports.isAutoOpenEnabled = isAutoOpenEnabled;
