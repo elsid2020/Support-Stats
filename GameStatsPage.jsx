@@ -116,7 +116,8 @@ function readPluginLightFlag(filePath) {
 }
 
 // MDI icon paths (hardcoded to avoid ES module import issues)  
-const MDI_CHEVRON_DOUBLE_RIGHT = 'M5.59,7.41L7,6L13,12L7,18L5.59,16.59L10.17,12L5.59,7.41M11.59,7.41L13,6L19,12L13,18L11.59,16.59L16.17,12L11.59,7.41Z'
+const MDI_CHEVRON_DOUBLE_RIGHT = 'M5.59,7.41L7,6L13,12L7,18L5.59,16.59L10.17,12L5.59,7.41M11.59,7.41L13,6L19,12L13,18L11.59,16.59L16.17,12L11.59,7.41Z';
+const MDI_CHEVRON_DOUBLE_DOWN = 'M16.59,5.59L18,7L12,13L6,7L7.41,5.59L12,10.17L16.59,5.59M16.59,11.59L18,13L12,19L6,13L7.41,11.59L12,16.17L16.59,11.59Z';
 const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z';
 const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';
 const discordIconPath = "M19.4308 5.26368C18.1561 4.67878 16.7892 4.24785 15.3599 4.00104C15.3339 3.99627 15.3079 4.00818 15.2945 4.03198C15.1187 4.34466 14.9239 4.75258 14.7876 5.0732C13.2503 4.84306 11.721 4.84306 10.2153 5.0732C10.0789 4.74545 9.87707 4.34466 9.70048 4.03198C9.68707 4.00897 9.66107 3.99707 9.63504 4.00104C8.20659 4.24706 6.83963 4.67799 5.56411 5.26368C5.55307 5.26844 5.54361 5.27638 5.53732 5.28669C2.94449 9.16032 2.23421 12.9387 2.58265 16.6703C2.58423 16.6886 2.59447 16.706 2.60867 16.7171C4.31934 17.9734 5.97642 18.7361 7.60273 19.2416C7.62876 19.2496 7.65634 19.24 7.6729 19.2186C8.05761 18.6933 8.40054 18.1393 8.69456 17.5568C8.71192 17.5227 8.69535 17.4822 8.65989 17.4687C8.11594 17.2624 7.598 17.0108 7.09977 16.7251C7.06037 16.7021 7.05721 16.6457 7.09347 16.6187C7.19831 16.5402 7.30318 16.4584 7.4033 16.3759C7.42141 16.3608 7.44665 16.3576 7.46794 16.3671C10.7411 17.8615 14.2846 17.8615 17.5191 16.3671C17.5404 16.3568 17.5657 16.36 17.5846 16.3751C17.6847 16.4576 17.7895 16.5402 17.8952 16.6187C17.9314 16.6457 17.9291 16.7021 17.8897 16.7251C17.3914 17.0163 16.8735 17.2624 16.3288 17.4679C16.2933 17.4814 16.2775 17.5227 16.2949 17.5568C16.5952 18.1385 16.9381 18.6924 17.3157 19.2178C17.3315 19.24 17.3599 19.2496 17.3859 19.2416C19.0201 18.7361 20.6772 17.9734 22.3879 16.7171C22.4028 16.706 22.4123 16.6894 22.4139 16.6711C22.8309 12.357 21.7154 8.60956 19.4568 5.28748C19.4513 5.27638 19.4419 5.26844 19.4308 5.26368ZM9.18335 14.3982C8.19792 14.3982 7.38594 13.4935 7.38594 12.3824C7.38594 11.2713 8.18217 10.3666 9.18335 10.3666C10.1924 10.3666 10.9965 11.2793 10.9807 12.3824C10.9807 13.4935 10.1845 14.3982 9.18335 14.3982ZM15.829 14.3982C14.8435 14.3982 14.0316 13.4935 14.0316 12.3824C14.0316 11.2713 14.8278 10.3666 15.829 10.3666C16.838 10.3666 17.6421 11.2793 17.6264 12.3824C17.6264 13.4935 16.838 14.3982 15.829 14.3982Z";
@@ -211,7 +212,7 @@ function statusIcon({ isOk }) {
       fill: isOk ? '#4caf50' : '#f44336',
       flexShrink: 0, marginRight: '6px', verticalAlign: 'middle'
     }
-  }, React.createElement('path', { d: !isOk ? MDI_CHEVRON_DOUBLE_RIGHT : null }));
+  }, React.createElement('path', { d: !isOk ? MDI_CHECK_CIRCLE : null }));
 }
 
 function warningBell(tooltip) {
@@ -578,6 +579,23 @@ function buildFaqItems(api, gamePath) {
             `Simply copy/move the files to your SSE folder`
           ),),
     },
+    {
+      heading: 'New content catalog check',
+      id: 'newcontentcatalog',
+      content:
+        React.createElement('p', null,
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => util.opn(path.join(process.env.LOCALAPPDATA, 'Skyrim Special Edition')).catch(() => undefined)
+          }, 'Open'),
+          ul(
+            'The 1.7.x SSE update changed the format of the contentcatalog.txt used to log installed Creations. The new format is incompatible with the 1.6.1170 version of SSE',
+            'This will cause a crash while trying to load the game - roughly just after the Bethesda logo appears',
+            'Delete the new <code>contentcatalog.txt</code> file and the game will be fine. This file is not required and will be recreated as needed in the correct format if you have downgraded',
+          ),),
+      
+      
+    },
 
   ];
 
@@ -653,7 +671,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.6.1";
+  const extensionVersion = "1.6.3";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -736,6 +754,27 @@ function GameStatsPage({ api }) {
 
 
 
+const [contentCatalogCheck, setContentCatalogCheck] = React.useState(null);  
+  
+useEffect(() => {  
+  let cancelled = false;  
+  const catalogPath = path.join(process.env.LOCALAPPDATA || '', 'Skyrim Special Edition', 'contentcatalog.txt');  
+  const csv2Pattern = /^CSV2_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;  
+  
+  async function newContentCatalogCheck() {  
+    try {  
+      const data = await nodeFs.promises.readFile(catalogPath, { encoding: 'utf8' });  
+      const found = data.split(/\r?\n/).some(line => csv2Pattern.test(line.trim()));  
+      if (!cancelled) setContentCatalogCheck(found);  
+    } catch (err) {  
+      if (!cancelled) setContentCatalogCheck(false);  
+    }  
+  }  
+  
+  newContentCatalogCheck();  
+  
+  return () => { cancelled = true; };  
+}, [refreshKey]);
 
   const acfPath = path.join(gamePath.replace(/(\\common\\Skyrim\ Special\ Edition)/gm, ''), 'appmanifest_489830.acf')
 
@@ -1096,7 +1135,7 @@ function GameStatsPage({ api }) {
   });
 
   const hasShownWelcome = useRef(false);
-  const welcomeSeen = useSelector(state => state?.settings?.immersiveSupport?.welcomeSeen ?? false);
+  const welcomeSeen = true; //useSelector(state => state?.settings?.immersiveSupport?.welcomeSeen ?? false);
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -1661,7 +1700,7 @@ function GameStatsPage({ api }) {
         React.createElement('button', {
           className: 'btn btn-default',
           onClick: showWelcomeDialog
-        }, 'Welcome'),
+        }, 'Tips'),
         React.createElement('div', { style: { marginBottom: '-6px' } }, 
           React.createElement('span', { title: 'Make Immersive Support the default tab' },  
             React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')  
@@ -1970,7 +2009,17 @@ function GameStatsPage({ api }) {
               }
             },
               // Column 1  
-              React.createElement('div', { style: { flex: '0 0 auto' } },
+              React.createElement('div', {
+                style: {
+                  display: 'grid',
+                  gridAutoFlow: 'column',
+                  gridTemplateRows: 'repeat(6, auto)',
+                  gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
+                  columnGap: '16px',
+                  rowGap: '0px',
+                },
+              },
+                // React.createElement('div', { style: { gridColumn: '1' } },
                 healthRow('Mods Deployed', isDeployed, null,
                   () => api.events.emit("show-main-page", "Mods"), "Jump to Mods tab"),
                 healthRow('Plugins Sorted', pluginsSorted, null,
@@ -1989,10 +2038,10 @@ function GameStatsPage({ api }) {
                   hasOneDrive
                     ? 'OneDrive found. Click to learn how to remove it.'
                     : null),
-                healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10), 
+                healthRow(`Creations OK: ${nativeCount}/${creationsExpected}`, (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10),
                   aeDLCInstalled === null
                     ? 'Checking...'
-                    : null, 
+                    : null,
                   null,
                   'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
                 healthRow('Not a removable drive', !isRemovable, null,
@@ -2002,9 +2051,9 @@ function GameStatsPage({ api }) {
                   isRemovable
                     ? "Removable drives are not suppoted. Click for details"
                     : null),
-              ),
-              // Column 2  
-              React.createElement('div', { style: { flex: '0 0 auto', marginLeft: '30px' } },
+                // ),
+                // Column 2  
+                // React.createElement('div', { style: { gridColumn: '2' } },
                 healthRow('No Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
                   healthAsync.updateAvailable === null
                     ? 'Checking...'
@@ -2013,13 +2062,16 @@ function GameStatsPage({ api }) {
                       : 'Vortex is up to date'),
                 healthRow('Deployment Method: ' + healthAsync.activatorType, healthAsync.activatorType === "Hardlinks", null,
                   healthAsync.activatorType !== "Hardlinks"
-                  ? () => {
-                    api.events.emit("show-main-page", "game_settings");
-                    api.store.dispatch(actions.setSettingsPage("Mods")) }
-                  : null,
-                  "Open Game Settings"
+                    ? () => {
+                      api.events.emit("show-main-page", "game_settings");
+                      api.store.dispatch(actions.setSettingsPage("Mods"))
+                    }
+                    : null,
+                  healthAsync.activatorType !== "Hardlinks"
+                    ? "Open Game Settings"
+                    : null
                 ),
-                healthRow('SKSE64 is Default Launcher', isXsePrimary, false,
+                healthRow('SKSE64 is Default Launcher', isXsePrimary, false, null, null
 
                 ),
                 healthRow('FNIS/Nemesis Not Installed', !hasFnisOrNemesis, false,
@@ -2049,10 +2101,21 @@ function GameStatsPage({ api }) {
                       api.events.emit('trigger-test-run', 'gamemode-activated');
                     }
                     : null,
-                  suppressedCount > 0 ? tooltipText : null)
+                  suppressedCount > 0 ? tooltipText : null),
+              // ),
+              // Column 3
+             // React.createElement('div', { style: { gridColumn: '3' } },
+              healthRow(
+                contentCatalogCheck
+                ? 'Incompatible contentcatalog.txt file'
+                : 'Compatible contentcatalog file', !contentCatalogCheck, null,
+                contentCatalogCheck
+                ? scrollToSection('newcontentcatalog')
+                : null,
+                null),
               ),
-            )
-          ),),
+            ),),
+          ),
         React.createElement('h3', null, 'Troubleshooting'),
         React.createElement('p', { style: { marginBottom: '12px', fontStyle: 'italic' } },
           'Stop. Do not remove or reinstall things on the first error prompt you are seeing. ' +
