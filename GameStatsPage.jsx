@@ -252,7 +252,7 @@ function reallyGoodRow(label) {
   return React.createElement('div', {
     style: { display: 'flex', alignItems: 'left', marginBottom: '4px', fontSize: '18px' }
   },
-    React.createElement(statusIcon,null,null),
+    React.createElement(statusIcon, null, null),
     React.createElement('span', null, label)
   );
 }
@@ -264,46 +264,47 @@ let healthStatsBad = 13;
 function healthRow(label, isGood, detail, onClick, tooltip) {
   if (!isGood) {
     healthStatsBad++;;
-  const icon = isGood
-    ? null //React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
-    : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start', fontSize: '14pt' } }, '✘');
+    const icon = isGood
+      ? null //React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
+      : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start', fontSize: '14pt' } }, '✘');
 
-  
-  return React.createElement('div', {
-    style: {
-      display: 'flex', alignItems: 'flex-start', marginBottom: '4px',
-      cursor: onClick ? 'pointer' : 'default',
-      borderRadius: '4px',
-      padding: '2px 4px',
-      transition: 'background-color 0.15s ease',
+
+    return React.createElement('div', {
+      style: {
+        display: 'flex', alignItems: 'flex-start', marginBottom: '4px',
+        cursor: onClick ? 'pointer' : 'default',
+        borderRadius: '4px',
+        padding: '2px 4px',
+        transition: 'background-color 0.15s ease',
+      },
+      onClick: onClick || undefined,
+      title: tooltip || undefined,
+      onMouseEnter: onClick
+        ? (e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }
+        : undefined,
+      onMouseLeave: onClick
+        ? (e) => { e.currentTarget.style.backgroundColor = 'transparent'; }
+        : undefined,
     },
-    onClick: onClick || undefined,
-    title: tooltip || undefined,
-    onMouseEnter: onClick
-      ? (e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; }
-      : undefined,
-    onMouseLeave: onClick
-      ? (e) => { e.currentTarget.style.backgroundColor = 'transparent'; }
-      : undefined,
-  },
-    icon,
-    React.createElement('span', { style: { fontSize: '14pt' } }, label),
-    detail
-      ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
-      : null,
-    !isGood
-      ? React.createElement('svg', {
-        viewBox: '0 0 24 24',
-        style: {
-          width: '18px', height: '18px',
-          fill: '#f44336',
-          flexShrink: 0, marginRight: '6px', verticalAlign: 'middle',
-          marginBottom: '-6px'
-        }
-      }, React.createElement('path', { d: MDI_CHEVRON_DOUBLE_RIGHT }))
-      : null
-  );
-}}
+      icon,
+      React.createElement('span', { style: { fontSize: '14pt' } }, label),
+      detail
+        ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
+        : null,
+      !isGood
+        ? React.createElement('svg', {
+          viewBox: '0 0 24 24',
+          style: {
+            width: '18px', height: '18px',
+            fill: '#f44336',
+            flexShrink: 0, marginRight: '6px', verticalAlign: 'middle',
+            marginBottom: '-6px'
+          }
+        }, React.createElement('path', { d: MDI_CHEVRON_DOUBLE_RIGHT }))
+        : null
+    );
+  }
+}
 
 
 
@@ -797,7 +798,7 @@ function GameStatsPage({ api }) {
       console.log('====contentcatlog check started')
       try {
         const data = await nodeFs.promises.readFile(catalogPath, { encoding: 'utf8' });
-        
+
         const found = data.split(/\r?\n/).some(line => line.includes(targetPattern));
         console.log('====data', data, '====', found)
         if (!cancelled) endCheck(); setContentCatalogCheck(found);
@@ -1480,9 +1481,9 @@ function GameStatsPage({ api }) {
       name.includes('fores new idles') ||
       name.includes('nemesis unlimited behavior engine') ||
       name.includes('nemesis behavior engine');
-    
+
     const isEnabled = profile?.modState?.[modId]?.enabled === true;
-    
+
     return isBad && isEnabled;
   });
 
@@ -1946,40 +1947,47 @@ function GameStatsPage({ api }) {
               React.createElement('strong', null,),
               row('Enabled Mods: ', `${enabledModsCount}`),
               row('Disabled Mods: ', `${disabledCount}`),
-              row('Collection: enabled mods (required + optional)', null),
-              React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                ...Object.entries(collectionCounts).map(([name, { total, required, optional }]) =>
-                  React.createElement('li', { key: name }, `${name}: ${total} (${required} + ${optional})`),
-                ),
-                React.createElement('li', { key: '__none__' }, `None: ${noneCount}`)
-              ),
-            ),
+              row(`Collection(s) ${collectionCount}: Enabled mods (required + optional)`, null),
+              React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },  
+  ...Object.entries(collectionCounts).map(([name, { total, required, optional }]) => {  
+    const mod = installedCollections.find(m => (util.renderModName(m) || m.id) === name);  
+    const tooltipText = mod  
+      ? (() => {  
+          const stats = getCollectionStats(mod, mods, profile);  
+          return `Enabled: ${stats.enabled}\n` +  
+                 `Disabled: ${stats.disabled}\n` +  
+                 `Not Installed: ${stats.notInstalled}\n` +  
+                 `Ignored: ${stats.ignored}`;  
+        })()  
+      : undefined;  
+  
+    return React.createElement('li', { key: name, title: tooltipText },  
+      `${name}: ${total} (${required} + ${optional})`  
+    );  
+  }),  
+  React.createElement('li', { key: '__none__' }, `None: ${noneCount}`)  
+),),
 
             //Column 2
+
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
-              // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
-              row('Total Active Plugins: ', `${activePlugins.length} `),
-              row('Disabled Plugins: ', disabledPlugins.length),
-              row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
-              row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),
-              row(
-                React.createElement('span', null,
-                  'Unmanaged Files: ',
-                  moreInfo('unmanagedfiles', 'More info'),
-                ),
-                unmanagedFiles.loading
-                  ? 'Scanning...'
-                  : React.createElement('div', null,
+              React.createElement('div', {
+                style: {
+                  display: 'grid',
+                  // gridAutoFlow: 'column',
+                  gridTemplateRows: 'repeat(2, auto)',
+                  gridTemplateColumns: 'repeat(2, 1fr)', // change 3 to however many columns you want  
+                  columnGap: '10px',
+                  rowGap: '0px',
+                },
+              },
+                // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
+                row('Total Active Plugins: ', `${activePlugins.length} `),
+                row('Disabled Plugins: ', disabledPlugins.length),
+                row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
+                row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),
 
-                    React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                      React.createElement('li', null, `${unmanagedFiles.plugins.length} plugins, ${unmanagedFiles.dlls.length} DLLs, ` +
-                        `${unmanagedFiles.textures.length} textures,`),
-                      React.createElement('li', null, `${unmanagedFiles.meshes.length} meshes, ` +
-                        `${unmanagedFiles.animations.length} animations`
-                      ),),
-
-                  )),
-            ),
+              ),),
           ),
           React.createElement('hr', null),
 
@@ -1999,7 +2007,7 @@ function GameStatsPage({ api }) {
             //column 2
             React.createElement('div', { style: { marginBottom: '10px' } },
               React.createElement('div', { style: { marginBottom: '10px' } },
-                React.createElement('strong', null, `Installed Collections (${collectionCount}):`),
+              /*  React.createElement('strong', null, `Installed Collections (${collectionCount}):`),
                 collectionCount > 0
                   ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
                     ...installedCollections.map(mod => {
@@ -2015,7 +2023,23 @@ function GameStatsPage({ api }) {
                       );
                     })
                   )
-                  : React.createElement('span', null, ' None')
+                  : React.createElement('span', null, ' None'),*/
+                row(React.createElement('span', null,
+                    'Unmanaged Files: ',
+                    moreInfo('unmanagedfiles', 'More info'),
+                  ),
+                  unmanagedFiles.loading
+                    ? 'Scanning...'
+                    : React.createElement('div', null,
+
+                      React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
+                        React.createElement('li', null, `${unmanagedFiles.plugins.length} plugins, ${unmanagedFiles.dlls.length} DLLs, ` +
+                          `${unmanagedFiles.textures.length} textures,`),
+                        React.createElement('li', null, `${unmanagedFiles.meshes.length} meshes, ` +
+                          `${unmanagedFiles.animations.length} animations`
+                        ),),
+
+                    )),
               ),
             ),
           ),
@@ -2055,163 +2079,168 @@ function GameStatsPage({ api }) {
                 style: { marginBottom: 0, width: 'fit-content' },
               }, 'Refresh')
             ),
-            
-            !settled  
-  ? React.createElement('div', {  
-      style: {  
-        display: 'flex',  
-        alignItems: 'center',  
-        justifyContent: 'center', 
-        marginLeft: '20px', 
-        flex: 1,  
-        minHeight: '160px', // give the box enough height to actually center within  
-      }  
-    },  
-      React.createElement(Spinner, {  
-        className: 'health-check-spinner',  
-        style: {  
-          width: '48px',  
-          height: '48px',  
-          opacity: 0.4, 
-        }  
-      })  
-    )
-            : React.createElement('div', {
-              style: {
-                display: 'flex',
-                justifyContent: 'center',
-                flex: 1,
-              }
-            },
-              // Column 1  
-              React.createElement('div', {
+
+            !settled
+              ? React.createElement('div', {
                 style: {
-                  display: 'grid',
-                  gridAutoFlow: 'column',
-                  // gridTemplateRows: 'repeat(6, auto)',
-                  // gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
-                  // columnGap: '16px',
-                  rowGap: '0px',
-                },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: '20px',
+                  flex: 1,
+                  minHeight: '120px',  // give the box enough height to actually center within  
+                  borderLeft: '2px solid orange',
+                  marginBottom: '-10px',
+
+                }
               },
+                React.createElement(Spinner, {
+                  className: 'health-check-spinner',
+                  style: {
+                    width: '36px',
+                    height: '36px',
+                    opacity: 0.4,
+                  }
+                })
+              )
+              : React.createElement('div', {
+                style: {
+                  display: 'flex',
+                  justifyContent: 'center',
+                  flex: 1,
+                  borderLeft: '2px solid orange',
+                  marginBottom: '-10px',
+                }
+              },
+                // Column 1  
+                React.createElement('div', {
+                  style: {
+                    display: 'grid',
+                    gridAutoFlow: 'column',
+                    // gridTemplateRows: 'repeat(6, auto)',
+                    // gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
+                    // columnGap: '16px',
+                    rowGap: '0px',
+                  },
+                },
 
-                // React.createElement('div', { style: { gridColumn: '1' } },
+                  // React.createElement('div', { style: { gridColumn: '1' } },
 
-                healthRow(isDeployed ? null : 'Mods Not Deployed', isDeployed, null,
-                  !isDeployed
-                  ? () => api.events.emit("show-main-page", "Mods")
-                  : null, "Jump to Mods tab"),
+                  healthRow(isDeployed ? null : 'Mods Not Deployed', isDeployed, null,
+                    !isDeployed
+                      ? () => api.events.emit("show-main-page", "Mods")
+                      : null, "Jump to Mods tab"),
 
-                healthRow(pluginsSorted ? null : 'Plugins Not Sorted', pluginsSorted, null,
-                  !pluginsSorted
-                  ? () => api.events.emit("show-main-page", "gamebryo-plugins")
-                  : null, "Jump to Plugins tab"),
+                  healthRow(pluginsSorted ? null : 'Plugins Not Sorted', pluginsSorted, null,
+                    !pluginsSorted
+                      ? () => api.events.emit("show-main-page", "gamebryo-plugins")
+                      : null, "Jump to Plugins tab"),
 
-                healthRow(gameLaunched ? null : 'INI Files Not Present', gameLaunched, false,
-                  !gameLaunched
-                    ? scrollToSection('notlaunchedthegame')
+                  healthRow(gameLaunched ? null : 'INI Files Not Present', gameLaunched, false,
+                    !gameLaunched
+                      ? scrollToSection('notlaunchedthegame')
+                      : null,
+                    !gameLaunched
+                      ? 'You failed to launch the game before you modded it. Click for details.'
+                      : null),
+
+                  healthRow(!hasOneDrive ? null : 'OneDrive found in INI Path', !hasOneDrive, false,
+                    hasOneDrive
+                      ? scrollToSection('removeonedrive')
+                      : null,
+                    hasOneDrive
+                      ? 'OneDrive found. Click to learn how to remove it.'
+                      : null),
+
+                  healthRow(
+                    ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10))
+                      ? null
+                      : `Creations/DLC missing: ${nativeCount}/${creationsExpected}`,
+                    (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10),
+                    aeDLCInstalled === null
+                      ? 'Checking...'
+                      : null,
+                    null,
+                    'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
+
+                  healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
+                    isRemovable
+                      ? scrollToSection('externaldrive')
+                      : null,
+                    isRemovable
+                      ? "Removable drives are not suppoted. Click for details"
+                      : null),
+
+                  healthRow(!updatePending ? null : 'Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
+                    healthAsync.updateAvailable === null
+                      ? 'Checking...'
+                      : healthAsync.updateAvailable && healthAsync.updateVersion
+                        ? `${healthAsync.updateVersion} Pending`
+                        : 'Vortex is up to date'),
+
+                  healthRow(
+                    healthAsync.activatorType === "Hardlinks" ? null : 'Experimental Deployment Method: ' + healthAsync.activatorType,
+                    healthAsync.activatorType === "Hardlinks", null,
+                    healthAsync.activatorType !== "Hardlinks"
+                      ? () => {
+                        api.events.emit("show-main-page", "game_settings");
+                        api.store.dispatch(actions.setSettingsPage("Mods"))
+                      }
+                      : null,
+                    healthAsync.activatorType !== "Hardlinks"
+                      ? "Open Game Settings"
+                      : null
+                  ),
+
+                  healthRow(isXsePrimary ? null : 'SKSE64 Not Default Launcher', isXsePrimary, false,
+                    !isXsePrimary
+                      ? () => api.events.emit("show-main-page", "tools_page")
+                      : null, "Jump to Tools tab"),
+
+                  healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
+                    fnisOrNemesisDetected
+                      ? scrollToSection('removefnis')
+                      : null,
+                    fnisOrNemesisDetected
+                      ? 'FNIS and Nemesis are not used. Click for details.'
+                      : null),
+
+                  healthRow(!hasUnmanagedFiles ? null : 'Unmanaged files found', !hasUnmanagedFiles,
+                    unmanagedFiles.loading
+                      ? 'Scanning...'
+                      : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
+                    hasUnmanagedFiles
+                      ? showUnmanagedDialog
+                      : null,
+                    hasUnmanagedFiles
+                      ? 'Click here to see a list of unmanaged files'
+                      : null),
+
+                  healthRow(suppressedCount === 0 ? null : 'Suppressed Notifications',
+                    suppressedCount === 0,
+                    suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
+                    suppressedCount > 0
+                      ? () => {
+                        suppressedIds.forEach(id =>
+                          api.suppressNotification?.(id, false));
+                        api.events.emit('trigger-test-run', 'gamemode-activated');
+                      }
+                      : null,
+                    suppressedCount > 0 ? tooltipText : null),
+
+                  healthRow(
+                    !contentCatalogCheck ? null : 'Incompatible contentcatalog.txt file',
+                    !contentCatalogCheck, null,
+                    contentCatalogCheck
+                      ? scrollToSection('newcontentcatalog')
+                      : null,
+                    null),
+                  // healthRow(healthStatsBad == 0 ? 'Your vitals are looking good!' : null, healthStatsBad == 0, null, null, healthStatsBad == 0 ? 'No obvious problems' : null),
+                  healthStatsBad == 0
+                    ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" }, reallyGoodRow("Health Stats look good!"))
                     : null,
-                  !gameLaunched
-                    ? 'You failed to launch the game before you modded it. Click for details.'
-                    : null),
 
-                healthRow(!hasOneDrive ? null : 'OneDrive found in INI Path', !hasOneDrive, false,
-                  hasOneDrive
-                    ? scrollToSection('removeonedrive')
-                    : null,
-                  hasOneDrive
-                    ? 'OneDrive found. Click to learn how to remove it.'
-                    : null),
-
-                healthRow(
-                  ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10))
-                    ? null
-                    : `Creations/DLC missing: ${nativeCount}/${creationsExpected}`,
-                  (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10),
-                  aeDLCInstalled === null
-                    ? 'Checking...'
-                    : null,
-                  null,
-                  'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
-
-                healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
-                  isRemovable
-                    ? scrollToSection('externaldrive')
-                    : null,
-                  isRemovable
-                    ? "Removable drives are not suppoted. Click for details"
-                    : null),
-
-                healthRow(!updatePending ? null : 'Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
-                  healthAsync.updateAvailable === null
-                    ? 'Checking...'
-                    : healthAsync.updateAvailable && healthAsync.updateVersion
-                      ? `${healthAsync.updateVersion} Pending`
-                      : 'Vortex is up to date'),
-
-                healthRow(
-                  healthAsync.activatorType === "Hardlinks" ? null : 'Experimental Deployment Method: ' + healthAsync.activatorType,
-                  healthAsync.activatorType === "Hardlinks", null,
-                  healthAsync.activatorType !== "Hardlinks"
-                    ? () => {
-                      api.events.emit("show-main-page", "game_settings");
-                      api.store.dispatch(actions.setSettingsPage("Mods"))
-                    }
-                    : null,
-                  healthAsync.activatorType !== "Hardlinks"
-                    ? "Open Game Settings"
-                    : null
-                ),
-
-                healthRow(isXsePrimary ? null : 'SKSE64 Not Default Launcher', isXsePrimary, false, 
-                  !isXsePrimary
-                  ? () => api.events.emit("show-main-page", "tools_page")
-                  : null, "Jump to Tools tab"),
-
-                healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
-                  fnisOrNemesisDetected
-                    ? scrollToSection('removefnis')
-                    : null,
-                  fnisOrNemesisDetected
-                    ? 'FNIS and Nemesis are not used. Click for details.'
-                    : null),
-
-                healthRow(!hasUnmanagedFiles ? null : 'Unmanaged files found', !hasUnmanagedFiles,
-                  unmanagedFiles.loading
-                    ? 'Scanning...'
-                    : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
-                  hasUnmanagedFiles
-                    ? showUnmanagedDialog
-                    : null,
-                  hasUnmanagedFiles
-                    ? 'Click here to see a list of unmanaged files'
-                    : null),
-
-                healthRow(suppressedCount === 0 ? null : 'Suppressed Notifications',
-                  suppressedCount === 0,
-                  suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
-                  suppressedCount > 0
-                    ? () => {
-                      suppressedIds.forEach(id =>
-                        api.suppressNotification?.(id, false));
-                      api.events.emit('trigger-test-run', 'gamemode-activated');
-                    }
-                    : null,
-                  suppressedCount > 0 ? tooltipText : null),
-
-                healthRow(
-                  !contentCatalogCheck ? null : 'Incompatible contentcatalog.txt file',
-                  !contentCatalogCheck, null,
-                  contentCatalogCheck
-                    ? scrollToSection('newcontentcatalog')
-                    : null,
-                  null),
-                // healthRow(healthStatsBad == 0 ? 'Your vitals are looking good!' : null, healthStatsBad == 0, null, null, healthStatsBad == 0 ? 'No obvious problems' : null),
-                healthStatsBad == 0
-                ? React.createElement('span', {style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1', title: "No obvious problems found" } }, reallyGoodRow("Vitals look good!"))
-                : null,
-
-              ),),),
+                ),),),
         ),
 
         React.createElement('h3', null, 'Troubleshooting'),
