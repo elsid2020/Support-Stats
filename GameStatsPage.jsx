@@ -791,14 +791,18 @@ function GameStatsPage({ api }) {
     let cancelled = false;
     beginCheck();
     const catalogPath = path.join(process.env.LOCALAPPDATA || '', 'Skyrim Special Edition', 'contentcatalog.txt');
-    const csv2Pattern = /^CSV2_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
+    // const csv2Pattern = /^CSV2_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const targetPattern = 'AchievementSafe'
     async function newContentCatalogCheck() {
+      console.log('====contentcatlog check started')
       try {
         const data = await nodeFs.promises.readFile(catalogPath, { encoding: 'utf8' });
-        const found = data.split(/\r?\n/).some(line => csv2Pattern.test(line.trim()));
+        
+        const found = data.split(/\r?\n/).some(line => line.includes(targetPattern));
+        console.log('====data', data, '====', found)
         if (!cancelled) endCheck(); setContentCatalogCheck(found);
       } catch (err) {
+        console.log('====error:', err)
         if (!cancelled) endCheck(); setContentCatalogCheck(false);
       }
     }
