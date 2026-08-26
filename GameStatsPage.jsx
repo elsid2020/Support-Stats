@@ -1478,7 +1478,7 @@ function GameStatsPage({ api }) {
       name.includes('nemesis behavior engine');
     
     const isEnabled = profile?.modState?.[modId]?.enabled === true;
-    console.log('====FNIS check: ',`isBad: ${isBad} & isEnabled: ${isEnabled}`)
+    
     return isBad && isEnabled;
   });
 
