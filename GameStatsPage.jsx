@@ -687,7 +687,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.7.0";
+  const extensionVersion = "1.7.1";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -769,6 +769,8 @@ function GameStatsPage({ api }) {
   const pluginList = useSelector(state =>
     (state.session?.plugins?.pluginList) ?? {}
   );
+
+  const fnisAutoRunCheck = useSelector((state) => util.getSafe(state, ['settings', 'fnis', 'autoRun'], false));
 
   const nativeCount = Object.values(pluginList).filter(p => p.isNative).length;
 
@@ -1467,18 +1469,21 @@ function GameStatsPage({ api }) {
   const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
 
   // FNIS or Nemesis installed and enabled  
-  const hasFnisOrNemesis = Object.entries(mods).some(([modId, mod]) => {
+  const hasFnisOrNemesisMods = Object.entries(mods).some(([modId, mod]) => {
     const name = (mod.attributes?.name || mod.id || '').toLowerCase();
     const isBad =
       name.includes('fnis data') ||
       name.includes('fores new idles') ||
       name.includes('nemesis unlimited behavior engine') ||
       name.includes('nemesis behavior engine');
-    const fnisAutoRunEnabled = useSelector((state) => util.getSafe(state, ['settings', 'fnis', 'autoRun'], false));
-    const isEnabled = (profile?.modState?.[modId]?.enabled === true) || fnisAutoRunEnabled;
-
+    
+    const isEnabled = profile?.modState?.[modId]?.enabled === true;
+    console.log('====FNIS check: ',`isBad: ${isBad} & isEnabled: ${isEnabled}`)
     return isBad && isEnabled;
   });
+
+  const fnisAutoRunEnabled = fnisAutoRunCheck;
+  const fnisOrNemesisDetected = hasFnisOrNemesisMods || fnisAutoRunEnabled;
 
   // Suppressed notifications
   const suppressedIds = Object.keys(suppressedNotifications)
@@ -2159,11 +2164,11 @@ function GameStatsPage({ api }) {
                   ? () => api.events.emit("show-main-page", "tools_page")
                   : null, "Jump to Tools tab"),
 
-                healthRow(!hasFnisOrNemesis ? null : 'FNIS/Nemesis found', !hasFnisOrNemesis, false,
-                  hasFnisOrNemesis
+                healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
+                  fnisOrNemesisDetected
                     ? scrollToSection('removefnis')
                     : null,
-                  hasFnisOrNemesis
+                  fnisOrNemesisDetected
                     ? 'FNIS and Nemesis are not used. Click for details.'
                     : null),
 
