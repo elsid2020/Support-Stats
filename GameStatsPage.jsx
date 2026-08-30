@@ -39,7 +39,7 @@ const filesToSkip = new Set([
 
 const expectedPluginCountMap = {
   'Immersive & Adult99': [440, 92],
-  'Immersive & Adult100': [0, 0],
+  'Immersive & Adult100': [440, 92],
   'Immersive & Pure11': [396, 91],
   'Immersive & Pure12': [0, 0],
 };
@@ -713,7 +713,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.8.0";
+  const extensionVersion = "1.8.1";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
