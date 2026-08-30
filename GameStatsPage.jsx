@@ -45,9 +45,11 @@ const expectedPluginCountMap = {
 };
 
 const expectedModCountMap = {
-  immersiveAdultReq99: [560, 13],
-  immersivePurereq13: [476, 12]
-}
+  'Immersive & Adult99': [547, 13],
+  'Immersive & Adult100': [555, 13],
+  'Immersive & Pure11': [477, 12],
+  'Immersive & Pure12': [0, 0],
+};
 
 
 
@@ -1752,7 +1754,10 @@ function GameStatsPage({ api }) {
 
 
   const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
-  const expectedTotalPlugins = collRequiredPlugs + collOptionalPlugs + nativeExpected;
+  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
+  
+  const expectedTotalPlugins =  healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs
+  const expectedTotalMods = healthAsync.aeDLCOwned === true ? collRequiredMods + collOptionalMods : collRequiredMods
 
   function showUnmanagedDialog() {
     const categories = [
@@ -2032,10 +2037,7 @@ function GameStatsPage({ api }) {
             // Column 1
             React.createElement('div', { style: { flex: '1', justifyContent: 'right' } },
               React.createElement('strong', null,
-                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' } }, enabledModsCount,
-                  healthAsync.aeDLCOwned === true
-                    ? mainRevisionNumber == '99' ? '/560' : '/568'
-                    : mainRevisionNumber == '99' ? '/547' : '/555'),),),
+                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' } }, `${enabledModsCount}/${expectedTotalMods}`),),),
               row('Disabled Mods: ', `${disabledCount}`),
               row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
