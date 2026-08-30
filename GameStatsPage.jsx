@@ -1,6 +1,6 @@
 const React = require('react');
 const { useSelector, useDispatch } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -36,6 +36,24 @@ const filesToSkip = new Set([
   'user.json.vortex_backup',
   'user.json',
 ]);
+
+const expectedPluginCountMap = {
+  'Immersive & Adult99': [440, 92],
+  'Immersive & Adult100': [0, 0],
+  'Immersive & Pure11': [396, 91],
+  'Immersive & Pure12': [0, 0],
+};
+
+const expectedModCountMap = {
+  immersiveAdultReq99: [560, 13],
+  immersivePurereq13: [476, 12]
+}
+
+
+
+
+
+
 
 function displayPath(fullPath) {
   const tempPath = fullPath.replace(/\\/g, '/').replace(/(\/(?:Users|home)\/)([^/]+)/i, '$1<USER>');
@@ -170,10 +188,10 @@ function getCollectionStats(collectionMod, mods, profile) {
   return stats;
 }
 
-function row(label, value) {
+function row(label, value, expectedValue) {
   return React.createElement('div', { style: { marginBottom: '10px' } },
     React.createElement('strong', null, label),
-    value
+    value, expectedValue
   );
 }
 
@@ -271,7 +289,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
 
     return React.createElement('div', {
       style: {
-        display: 'flex', alignItems: 'flex-start', marginBottom: '4px',
+        display: 'flex', alignItems: 'baseline', marginBottom: '4px',
         cursor: onClick ? 'pointer' : 'default',
         borderRadius: '4px',
         padding: '2px 4px',
@@ -287,7 +305,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
         : undefined,
     },
       icon,
-      React.createElement('span', { style: { fontSize: '14pt' } }, label),
+      React.createElement('span', { style: { fontSize: '12pt' } }, label),
       detail
         ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
         : null,
@@ -295,7 +313,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
         ? React.createElement('svg', {
           viewBox: '0 0 24 24',
           style: {
-            width: '18px', height: '18px',
+            width: '12px', height: '12px',
             fill: '#f44336',
             flexShrink: 0, marginRight: '6px', verticalAlign: 'middle',
             marginBottom: '-6px'
@@ -327,10 +345,14 @@ try { winapi = require('winapi-bindings'); } catch (e) { winapi = null; }
 function getSteamPath() {
   if (process.env.WINEPREFIX || process.env.WINELOADER) {
     // Wine host 
-    const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
-    const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
-    return wineResult;
-  } else if ((!process.env.WINEPREFIX || process.env.WINELOADER) && process.platform === 'win32') {
+    try {
+      const wineHomeDir = process.env.WINEHOMEDIR.substring(4,);
+      const wineResult = path.join(wineHomeDir, '.local\\share\\Steam');
+      return wineResult;
+    } catch (err) {
+      return undefined;
+    }
+  } else if (process.platform === 'win32') {
     // Windows host
     try {
       const winapi = require('winapi-bindings');
@@ -358,8 +380,9 @@ function getSteamPath() {
       path.join(home, '.steam', 'steam'),
     ];
     for (const candidate of candidates) {
-      if (fs.existsSync)// (path.join(candidate, 'config', 'libraryfolders.vdf'))) {  
+      if (fs.existsSync(path.join(candidate, 'config', 'libraryfolders.vdf'))) {
         return candidate;
+      }
     }
   }
   return undefined;
@@ -377,7 +400,7 @@ async function isReadOnly(filePath) {
   }
 }
 
-const steamPath = getSteamPath();
+
 
 function getVcppVersion(arch) {
   if (!winapi) return null;
@@ -688,7 +711,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.7.2";
+  const extensionVersion = "1.8.0";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -729,6 +752,9 @@ function GameStatsPage({ api }) {
 
   const pendingRef = React.useRef(0);
   const [settled, setSettled] = React.useState(false);
+
+  const steamPath = getSteamPath();
+
 
   function beginCheck() {
     pendingRef.current++;
@@ -795,16 +821,13 @@ function GameStatsPage({ api }) {
     // const csv2Pattern = /^CSV2_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const targetPattern = 'AchievementSafe'
     async function newContentCatalogCheck() {
-      console.log('====contentcatlog check started')
       try {
         const data = await nodeFs.promises.readFile(catalogPath, { encoding: 'utf8' });
 
         const found = data.split(/\r?\n/).some(line => line.includes(targetPattern));
-        console.log('====data', data, '====', found)
-        if (!cancelled) endCheck(); setContentCatalogCheck(found);
+        if (!cancelled) { endCheck(); setContentCatalogCheck(found); }
       } catch (err) {
-        console.log('====error:', err)
-        if (!cancelled) endCheck(); setContentCatalogCheck(false);
+        if (!cancelled) { endCheck(); setContentCatalogCheck(false); }
       }
     }
 
@@ -824,9 +847,9 @@ function GameStatsPage({ api }) {
     (async () => {
       try {
         await nodeFs.promises.access(acfPath, nodeFs.constants.W_OK);
-        if (!cancelled) endCheck(); setSkyrimVerionLocked(false);
+        if (!cancelled) { endCheck(); setSkyrimVerionLocked(false); }
       } catch (err) {
-        if (!cancelled) endCheck(); setSkyrimVerionLocked(true);
+        if (!cancelled) { endCheck(); setSkyrimVerionLocked(true); }
       }
     })();
     return () => { cancelled = true; };
@@ -852,21 +875,29 @@ function GameStatsPage({ api }) {
       return null; // unterminated — treat as not found
     }
 
-    async function readWithTimeout(filePath, ms = 3000) {
-      return Promise.race([
-        fs.readFileAsync(filePath, 'utf8'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-      ]);
+    async function readWithTimeout(filePath, ms = 5000) {
+      let timer;
+      try {
+        return await Promise.race([
+          fs.readFileAsync(filePath, 'utf8'),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('timeout')), ms);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
     }
+
 
     async function checkAEOwnership() {
 
-      if (!cancelled) endCheck(); setHealthAsync(p => ({ ...p, aeDLCOwnedManual: false }));
+      if (!cancelled) { endCheck(); setHealthAsync(p => ({ ...p, aeDLCOwnedManual: false })); }
 
       try {
         // const steamPath = getSteamPath();
         if (!steamPath) {
-          if (!cancelled) endCheck(); setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' }));
+          if (!cancelled) { endCheck(); setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' })); }
           return;
         }
         const userDataPath = path.join(steamPath, 'userdata');
@@ -904,27 +935,33 @@ function GameStatsPage({ api }) {
           } catch { /* diagnostic fallback unavailable, ignore */ }
         }
 
-        if (!cancelled) endCheck(); {
+        if (!cancelled) {
+          endCheck();
           setHealthAsync(p =>
             p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: owned ? true : 'unknown' }
           );
         }
       } catch {
-        if (!cancelled) endCheck(); setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: 'unknown' }));
+        if (!cancelled) { endCheck(); setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: 'unknown' })); }
       }
     }
 
     checkAEOwnership();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [steamPath, refreshKey]);
 
-  const creationsExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
+  const nativeExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
 
 
 
   const totalModsInstalled = Object.values(mods).filter(
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
+
+  const srsInstalled = Object.values(mods).find(
+    m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper')
+
+  );
 
   const [hardwareInfo, setHardwareInfo] = React.useState({
     cpu: 'Loading...',
@@ -1026,9 +1063,9 @@ function GameStatsPage({ api }) {
     async function fetchManifest() {
       try {
         const result = await util.getManifest(api, undefined, activeGameId);
-        if (!cancelled) endCheck(); setManifest(result);
+        if (!cancelled) { endCheck(); setManifest(result); }
       } catch (err) {
-        if (!cancelled) endCheck(); setManifest(null);
+        if (!cancelled) { endCheck(); setManifest(null); }
       }
     }
 
@@ -1065,8 +1102,37 @@ function GameStatsPage({ api }) {
 
   const visibleTools = toolsExpanded ? toolList : toolList.slice(0, MAX_VISIBLE_TOOLS);
 
-  const spaceUsed = gameInfo?.size?.value;
-  const spaceNoLinks = gameInfo?.size_nolinks?.value;
+  // const spaceUsed = gameInfo?.size?.value;
+  // const spaceNoLinks = gameInfo?.size_nolinks?.value;
+
+  const [spaceUsed, setSpaceUsed] = React.useState(null);
+  const [spaceNoLinks, setSpaceNoLinks] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    //const gameId = selectors.activeGameId(state);
+    new Promise((resolve, reject) => {
+      api.events.emit('refresh-game-info', activeGameId, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    })
+      .then(() => {
+        if (cancelled) return;
+        const state = api.store.getState();
+        const info = util.getSafe(state, ['persistent', 'gameMode', 'gameInfo', activeGameId], {});
+        setSpaceUsed(util.getSafe(info, ['size', 'value'], null));
+        setSpaceNoLinks(util.getSafe(info, ['size_nolinks', 'value'], null));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSpaceUsed(0);
+          setSpaceNoLinks(0);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [activeGameId, refreshKey]);
 
   const [driveInfo, setDriveInfo] = useState({ game: null, system: null });
 
@@ -1529,6 +1595,7 @@ function GameStatsPage({ api }) {
       (coll.rules || []).forEach(rule => {
         const refId = rule.reference?.id;
         const entry = { coll, type: rule.type }; // 'requires' | 'recommends'  
+
         if (refId !== undefined) {
           if (!map[refId]) map[refId] = [];
           map[refId].push(entry);
@@ -1539,7 +1606,8 @@ function GameStatsPage({ api }) {
             map[installed.id].push(entry);
           }
         }
-      });
+      })
+
     });
     return map;
   }, [mods, refreshKey]);
@@ -1574,6 +1642,8 @@ function GameStatsPage({ api }) {
       });
     }
   });
+
+
 
   //Get plugin details for the current game
 
@@ -1618,7 +1688,7 @@ function GameStatsPage({ api }) {
     ).then(results => {
       setPluginHeaders(Object.fromEntries(results));
     });
-  }, [gamePath, activeGameId, refreshKey]);
+  }, [gamePath, activeGameId, pluginList, refreshKey]);
 
 
   const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder, refreshKey]);
@@ -1669,6 +1739,20 @@ function GameStatsPage({ api }) {
     (mod) => mod.type === 'collection' && mod.state === 'installed'
   );
   const collectionCount = installedCollections.length;
+
+  const mainCollectionAttributes = installedCollections.find(m => {
+    const modName = util.renderModName(m) || m.id;
+    return modName === 'Immersive & Adult' || modName === 'Immersive & Pure';
+
+  },);
+  const mainRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
+  const baseCollectionName = mainCollectionAttributes
+    ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
+    : undefined;
+
+
+  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
+  const expectedTotalPlugins = collRequiredPlugs + collOptionalPlugs + nativeExpected;
 
   function showUnmanagedDialog() {
     const categories = [
@@ -1776,7 +1860,10 @@ function GameStatsPage({ api }) {
             position: 'relative',
           }
         },
-          React.createElement('h2', null, 'Support Stats - Immersive Support'),
+          React.createElement('h2', null, `Support Stats - `, 
+            baseCollectionName == 'Immersive & Pure' || baseCollectionName == 'Immersive & Adult'
+            ? `${baseCollectionName} Rev.${mainRevisionNumber}`
+            : 'non-Immersive Collection'),
           row('v' + extensionVersion),
           row('Vortex Version: ', vortexVersion),
           React.createElement('div', {
@@ -1941,33 +2028,39 @@ function GameStatsPage({ api }) {
 
           React.createElement('hr', null),
 
-          React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },
+          React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'right' } },
             // Column 1
-            React.createElement('div', { style: { flex: '1' } },
-              React.createElement('strong', null,),
-              row('Enabled Mods: ', `${enabledModsCount}`),
+            React.createElement('div', { style: { flex: '1', justifyContent: 'right' } },
+              React.createElement('strong', null,
+                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' } }, enabledModsCount,
+                  healthAsync.aeDLCOwned === true
+                    ? mainRevisionNumber == '99' ? '/560' : '/568'
+                    : mainRevisionNumber == '99' ? '/547' : '/555'),),),
               row('Disabled Mods: ', `${disabledCount}`),
-              row(`Collection(s) ${collectionCount}: Enabled mods (required + optional)`, null),
-              React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },  
-  ...Object.entries(collectionCounts).map(([name, { total, required, optional }]) => {  
-    const mod = installedCollections.find(m => (util.renderModName(m) || m.id) === name);  
-    const tooltipText = mod  
-      ? (() => {  
-          const stats = getCollectionStats(mod, mods, profile);  
-          return `Enabled: ${stats.enabled}\n` +  
-                 `Disabled: ${stats.disabled}\n` +  
-                 `Not Installed: ${stats.notInstalled}\n` +  
-                 `Ignored: ${stats.ignored}`;  
-        })()  
-      : undefined;  
-  
-    return React.createElement('li', { key: name, title: tooltipText },  
-      `${name}: ${total} (${required} + ${optional})`  
-    );  
-  }),  
-  React.createElement('li', { key: '__none__' }, `None: ${noneCount}`)  
-),),
+              row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
+              React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
+                ...Object.entries(collectionCounts).map(([name, { total, required, optional }]) => {
+                  const mod = installedCollections.find(m => (util.renderModName(m) || m.id) === name);
+                  const tooltipText = mod
+                    ? (() => {
+                      const stats = getCollectionStats(mod, mods, profile);
+                      return `Enabled: ${stats.enabled}\n` +
+                        `Disabled: ${stats.disabled}\n` +
+                        `Not Installed: ${stats.notInstalled}\n` +
+                        `Ignored: ${stats.ignored}`;
+                    })()
+                    : undefined;
 
+                  return React.createElement('li', { key: name, title: tooltipText },
+                    `${name}: ${total} `, React.createElement('span', { style: { fontSize: '12px', opacity: 0.75 } }, `(${required} + ${optional})`),
+                  );
+                }),
+                React.createElement('li', { key: '__none__' }, `None: ${noneCount}`)
+              ),),
+
+            React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
+              React.createElement('div', {}),
+            ),
             //Column 2
 
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
@@ -1979,15 +2072,22 @@ function GameStatsPage({ api }) {
                   gridTemplateColumns: 'repeat(2, 1fr)', // change 3 to however many columns you want  
                   columnGap: '10px',
                   rowGap: '0px',
+
+                  // index < items.length - 1 ? { borderRight: '1px solid #ccc' } : null,
                 },
               },
                 // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
-                row('Total Active Plugins: ', `${activePlugins.length} `),
-                row('Disabled Plugins: ', disabledPlugins.length),
-                row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
-                row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),
+                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' } },
+                  row('Total Active Plugins: ', `${activePlugins.length}`, `/${expectedTotalPlugins}`),
+                  row('Disabled Plugins: ', disabledPlugins.length),),
+                React.createElement('div', null,
+                  row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
+                  row('Light Plugins: ', eslGame ? `${lightPlugins.length} / ${lightLimit}` : 'Not supported'),),
 
-              ),),
+
+              ),
+              // row('Expected Plugins: ', null, expectedTotalPlugins),
+            ),
           ),
           React.createElement('hr', null),
 
@@ -2007,27 +2107,27 @@ function GameStatsPage({ api }) {
             //column 2
             React.createElement('div', { style: { marginBottom: '10px' } },
               React.createElement('div', { style: { marginBottom: '10px' } },
-              /*  React.createElement('strong', null, `Installed Collections (${collectionCount}):`),
-                collectionCount > 0
-                  ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                    ...installedCollections.map(mod => {
-                      const stats = getCollectionStats(mod, mods, profile);
-                      const tooltipText =
-                        `Enabled: ${stats.enabled}\n` +
-                        `Disabled: ${stats.disabled}\n` +
-                        `Not Installed: ${stats.notInstalled}\n` +
-                        `Ignored: ${stats.ignored}`;
-
-                      return React.createElement('li', { key: mod.id, title: tooltipText },
-                        util.renderModName(mod) || mod.id
-                      );
-                    })
-                  )
-                  : React.createElement('span', null, ' None'),*/
+                /*  React.createElement('strong', null, `Installed Collections (${collectionCount}):`),
+                  collectionCount > 0
+                    ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
+                      ...installedCollections.map(mod => {
+                        const stats = getCollectionStats(mod, mods, profile);
+                        const tooltipText =
+                          `Enabled: ${stats.enabled}\n` +
+                          `Disabled: ${stats.disabled}\n` +
+                          `Not Installed: ${stats.notInstalled}\n` +
+                          `Ignored: ${stats.ignored}`;
+  
+                        return React.createElement('li', { key: mod.id, title: tooltipText },
+                          util.renderModName(mod) || mod.id
+                        );
+                      })
+                    )
+                    : React.createElement('span', null, ' None'),*/
                 row(React.createElement('span', null,
-                    'Unmanaged Files: ',
-                    moreInfo('unmanagedfiles', 'More info'),
-                  ),
+                  'Unmanaged Files: ',
+                  moreInfo('unmanagedfiles', 'More info'),
+                ),
                   unmanagedFiles.loading
                     ? 'Scanning...'
                     : React.createElement('div', null,
@@ -2097,8 +2197,8 @@ function GameStatsPage({ api }) {
                 React.createElement(Spinner, {
                   className: 'health-check-spinner',
                   style: {
-                    width: '36px',
-                    height: '36px',
+                    width: '24px',
+                    height: '24px',
                     opacity: 0.4,
                   }
                 })
@@ -2116,11 +2216,11 @@ function GameStatsPage({ api }) {
                 React.createElement('div', {
                   style: {
                     display: 'grid',
-                    gridAutoFlow: 'column',
+                    //gridAutoFlow: 'column',
                     // gridTemplateRows: 'repeat(6, auto)',
-                    // gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
+                    gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
                     // columnGap: '16px',
-                    rowGap: '0px',
+                    //rowGap: '0px',
                   },
                 },
 
@@ -2155,7 +2255,7 @@ function GameStatsPage({ api }) {
                   healthRow(
                     ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10))
                       ? null
-                      : `Creations/DLC missing: ${nativeCount}/${creationsExpected}`,
+                      : `Creations/DLC missing: ${nativeCount}/${nativeExpected}`,
                     (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10),
                     aeDLCInstalled === null
                       ? 'Checking...'
@@ -2208,7 +2308,7 @@ function GameStatsPage({ api }) {
                   healthRow(!hasUnmanagedFiles ? null : 'Unmanaged files found', !hasUnmanagedFiles,
                     unmanagedFiles.loading
                       ? 'Scanning...'
-                      : hasUnmanagedFiles ? `${totalUnmanaged} files` : null,
+                      : hasUnmanagedFiles ? `${totalUnmanaged}` : null,
                     hasUnmanagedFiles
                       ? showUnmanagedDialog
                       : null,
@@ -2218,7 +2318,7 @@ function GameStatsPage({ api }) {
 
                   healthRow(suppressedCount === 0 ? null : 'Suppressed Notifications',
                     suppressedCount === 0,
-                    suppressedCount > 0 ? `${suppressedCount} suppressed` : null,
+                    suppressedCount > 0 ? suppressedCount : null,
                     suppressedCount > 0
                       ? () => {
                         suppressedIds.forEach(id =>
@@ -2228,16 +2328,21 @@ function GameStatsPage({ api }) {
                       : null,
                     suppressedCount > 0 ? tooltipText : null),
 
-                  healthRow(
-                    !contentCatalogCheck ? null : 'Incompatible contentcatalog.txt file',
-                    !contentCatalogCheck, null,
-                    contentCatalogCheck
-                      ? scrollToSection('newcontentcatalog')
-                      : null,
-                    null),
-                  // healthRow(healthStatsBad == 0 ? 'Your vitals are looking good!' : null, healthStatsBad == 0, null, null, healthStatsBad == 0 ? 'No obvious problems' : null),
+                  !srsInstalled  // Skip the contentcatalog check if using SRS
+                    ? healthRow(
+                      !contentCatalogCheck ? null : 'Incompatible contentcatalog',
+                      !contentCatalogCheck, null,
+                      contentCatalogCheck
+                        ? scrollToSection('newcontentcatalog')
+                        : null,
+                      null)
+                    : null,
+
+
+
                   healthStatsBad == 0
-                    ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" }, reallyGoodRow("Health Stats look good!"))
+                    ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" },
+                      reallyGoodRow("Health Stats look good!"))
                     : null,
 
                 ),),),
