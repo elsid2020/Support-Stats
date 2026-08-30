@@ -713,7 +713,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.8.1";
+  const extensionVersion = "1.8.2";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
