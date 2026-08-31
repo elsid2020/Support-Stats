@@ -41,7 +41,7 @@ const expectedPluginCountMap = {
   'Immersive & Adult99': [440, 92],
   'Immersive & Adult100': [440, 92],
   'Immersive & Pure11': [396, 91],
-  'Immersive & Pure12': [0, 0],
+  'Immersive & Pure12': [396, 91],
 };
 
 const expectedModCountMap = {
@@ -1210,7 +1210,7 @@ function GameStatsPage({ api }) {
           `powershell -NoProfile -Command "Get-Disk -Number ${diskNumber} | Select-Object -ExpandProperty BusType"`
         );
 
-        setIsRemovable(stdout.trim() === 'USB');
+        setIsRemovable(['USB', 'SD', 'MMC'].includes(stdout.trim()));
 
       } catch (err) {
         setIsRemovable(false);
@@ -1738,7 +1738,7 @@ function GameStatsPage({ api }) {
   const gameProfileCount = gameProfiles.length;
 
   const installedCollections = Object.values(mods).filter(
-    (mod) => mod.type === 'collection' && mod.state === 'installed'
+    (mod) => mod.type === 'collection' && mod.state === 'installed' &&  profile?.modState?.[mod.id]?.enabled === true
   );
   const collectionCount = installedCollections.length;
 
