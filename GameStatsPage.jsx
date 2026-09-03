@@ -808,7 +808,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.9.1";
+  const extensionVersion = "1.9.2";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -2472,15 +2472,15 @@ function GameStatsPage({ api }) {
                     : null,
                   ///////////////  
                   healthRow(
-                    healthAsync.aeDLCOwned == true && collectionCounts[baseCollectionName].optional == 13
+                    healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
                       ? null
-                      : healthAsync.aeDLCOwned != true && collectionCounts[baseCollectionName].optional == 13
+                      : healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
                         ? 'Optional Mods without DLC'
-                        : healthAsync.aeDLCOwned == true && collectionCounts[baseCollectionName].optional == 0
+                        : healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
                           ? 'Missing Optional Mods'
                           : null,
 
-                    healthAsync.aeDLCOwned == true && collectionCounts[baseCollectionName].optional == 13 || healthAsync.aeDLCOwned != true && collectionCounts[baseCollectionName].optional == 0,
+                    healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13 || healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0,
                     null,
                     () => {
                       const batched = [
