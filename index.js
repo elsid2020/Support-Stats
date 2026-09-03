@@ -55,6 +55,7 @@ function init(context) {
     });
     });
         
+  context.once(() => {
     // Optional: reset the flag when mods are deployed (user should re-sort)  
     context.api.events.on('did-deploy', () => {  
       context.api.store.dispatch({  
@@ -62,6 +63,7 @@ function init(context) {
         payload: { value: false },  
       });  
     });
+  });
     
     context.once(() => {
       context.api.onStateChange(['settings', 'profiles', 'activeProfileId'], () => {
