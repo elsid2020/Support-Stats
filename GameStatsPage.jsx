@@ -1,6 +1,6 @@
 const React = require('react');
 const { useSelector, useDispatch } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -8,7 +8,9 @@ const { shell, clipboard } = require('electron');
 const { exec, execFile } = require('child_process');
 const { count } = require('console');
 const { json } = require('stream/consumers');
-const semver = require('semver')
+const semver = require('semver');
+const IniParser = require('vortex-parse-ini').default;  
+const { WinapiFormat } = require('vortex-parse-ini');  
 
 const iniFileMap = {
   skyrim: ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],
@@ -166,6 +168,36 @@ function getIniPaths(gameId) {
   return subPaths.map(p => path.join(docsPath, 'My Games', p));
 }
 
+function getSkyrimPrefsPath(gameId) {  
+  const paths = getIniPaths(gameId);  
+  return paths.find(p => p.toLowerCase().endsWith('skyrimprefs.ini'));  
+}  
+  
+async function setBFreebiesSeen(gameId, api) {  
+  const parser = new IniParser(new WinapiFormat());  
+  const iniPath = getSkyrimPrefsPath(gameId);  
+  
+  if (!iniPath) {  
+    api.showErrorNotification('Could not locate skyrimprefs.ini', new Error('No matching path found'), { allowReport: false });  
+    return;  
+  }  
+  
+  try {  
+    await fs.forcePerm(api.translate, () =>  
+      parser.read(iniPath).then((data) => {  
+        data.data.General = data.data.General || {};  
+        data.data.General.bFreebiesSeen = 0;  
+        return parser.write(iniPath, data);  
+      }),  
+    );  
+  } catch (err) {  
+    if (err instanceof util.UserCanceled) {  
+      return; // user dismissed the permission dialog, don't crash  
+    }  
+    api.showErrorNotification('Failed to update skyrimprefs.ini', err, { allowReport: false });  
+  }  
+}
+
 function getCollectionStats(collectionMod, mods, profile) {
   const rules = collectionMod.rules ?? [];
   const stats = { enabled: 0, disabled: 0, notInstalled: 0, ignored: 0 };
@@ -291,7 +323,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
 
     return React.createElement('div', {
       style: {
-        display: 'flex', alignItems: 'baseline', marginBottom: '4px',
+        display: 'flex', alignItems: 'baseline', marginBottom: '4px', justifyContent: 'center',
         cursor: onClick ? 'pointer' : 'default',
         borderRadius: '4px',
         padding: '2px 4px',
@@ -311,12 +343,13 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
       detail
         ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
         : null,
-      !isGood
+      !isGood && onClick != null
         ? React.createElement('svg', {
           viewBox: '0 0 24 24',
           style: {
-            width: '12px', height: '12px',
-            fill: '#f44336',
+            width: '15px', height: '15px',
+            fill: 'var(--color-primary-moderate)',
+            cursor: 'pointer',
             flexShrink: 0, marginRight: '6px', verticalAlign: 'middle',
             marginBottom: '-6px'
           }
@@ -329,7 +362,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
 
 
 function copyButton(text, tooltip) {
-  return React.createElement('span', { title: tooltip || 'Copy to clipboard', style: { cursor: 'pointer', marginLeft: '6px' } },
+  return React.createElement('span', { title: tooltip || 'Copy to clipboard', style: { color: 'var(--color-primary-moderate)', cursor: 'pointer', marginLeft: '6px' } },
     React.createElement('button', {
       className: 'btn-embed',
       style: { background: 'none', border: 'none', padding: 0 },
@@ -476,7 +509,7 @@ function FaqItem({ heading, children, id }) {
       : null
   );
 }
-function buildFaqItems(api, gamePath) {
+function buildFaqItems(api, gamePath, gameId) {
   return [
     {
       heading: 'Crash to desktop when clicking new game:',
@@ -638,6 +671,68 @@ function buildFaqItems(api, gamePath) {
 
 
     },
+    {
+      heading: 'Bethesda Creations',
+      id: 'missingcc',
+      content: 
+        React.createElement('p', null,
+          ul(
+        'Creation Club content ',
+        '━━━━━━━━━━━━━━━━━━━━',
+        'First off - Make sure the check box at the top of this page is set correctly. Auto detection of the AE DLC purchase isn\'t perfect. Simply add/remove the check as needed',
+        'Family sharing is not supported, you MUST own the AE DLC yourself if you choose to install the optional mods',
+        '━━━━━━━━━━━━━━━━━━━━',
+        'Are you receiving an error about missing masters or plugins that start with cc in the name, such as ccffbsse002-crossbowpack.esl and ccbgssse063-ba_ebony.esl and so on?',
+        '',
+        'This means you did one of the following:',
+        'A) You forgot to download the creation club content that comes with the game Anniversary Edition DLC you purchased. This content can only be downloaded in game.',
+        'B) You do not have Anniversary Edition DLC purchased, yet you installed all optional mods anyway.',
+        '<h3>REMEMBER: Creations aside from the 4 free, or the AE DLC ARE NOT SUPPORTED. DO NOT INSTALL THEM</h3>',
+        '━━━━━━━━━━━━━━━━━━━━',
+        ' How To Fix',
+        '<h1>A) IF YOU OWN AE DLC</h1>',),
+        React.createElement('span', null, React.createElement('button', {
+          className: 'btn btn-default',
+          onClick: () => {setBFreebiesSeen(gameId, api)}
+        },'Click to Download DLC on next start'), '   -OR-'),
+      ul(
+        '1) In Vortex, go to the Mods tab, and hit the Purge Mods button. Wait for it to finish.',
+        '2) Go to Steam and launch Skyrim as if it was unmodded via the vanilla launcher.',
+        'You may get a popup asking if you want to download content. If you get it, confirm it. But if you don\'t, go to Creation Club menu.',
+        '3) Click Options at the bottom. Then click "Download All Owned Creation Club Content" DO NOT ALT-TAB from the game, as that can break the download process. Before quitting creations menu, check these 2 creations manually and make sure they are installed as well just in case you fail to get them:',
+        'The Dwarven Armored Mudcrab',
+        'Alternative Armors - Elven Hunter',
+        '4) Once finished, close the game, go back to Vortex, and click Deploy Mods in the Mods tab. Wait for it to finish.',
+        '5) In the Plugins tab, click Sort Now. Wait for the spinning wheels to disappear.',
+        '6) Make sure you don\'t have any Vortex notifications anymore, then launch the game via SKSE again.',
+        '',
+        '<h1>B) IF YOU DON\'T OWN AE DLC</h1>',),
+        React.createElement('button', {
+          className: 'btn btn-default',
+          onClick: () => {
+                     const batched = [
+                        actions.setAttributeFilter('collection-mods', undefined, null),
+                        actions.setGroupingAttribute('collection-mods', null),
+                        actions.setAttributeFilter('collection-mods', 'required', false),
+                      ];
+                      util.batchDispatch(api.store.dispatch, batched);
+                      // api.events.emit("show-main-page", "Collections");
+                      api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods")}
+                    },'Open the I&A collections tab'),
+      ul(
+      'You have installed the optional mods and they need to be disabled by following these steps:',
+      '1) Go to the collections tab in Vortex',
+      '2) Hover the collection and click the view button',
+      '3) In the Collection Mod that opens change the required fitler to "Recommended"',
+      '4) Disable all of the listed mods',
+      '5) Restart Vortex',
+      '6) Go to the mods tab and click the Purge button',
+      '7) On the same tab click the Deploy button',
+      '8) Go to the plugins tab and make sure ALL plugins are enabled',
+      '9) Click the Sort now button',
+      
+      ),)
+    },
 
   ];
 
@@ -713,7 +808,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.8.2";
+  const extensionVersion = "1.9.0";
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -813,6 +908,9 @@ function GameStatsPage({ api }) {
           null; // pluginList not loaded yet
 
 
+  const nativeStatus = healthAsync.aeDLCOwned
+    ? (nativeCount > 80 ? 'Too Many Creations' : nativeCount < 80 ? 'Missing Creations' : null)
+    : (nativeCount > 10 ? 'Too Many Creations' : nativeCount < 10 ? 'Missing Creations' : null);
 
   const [contentCatalogCheck, setContentCatalogCheck] = React.useState(null);
 
@@ -899,7 +997,7 @@ function GameStatsPage({ api }) {
       try {
         // const steamPath = getSteamPath();
         if (!steamPath) {
-          if (!cancelled) { endCheck(); setHealthAsync(p => ({ ...p, aeDLCOwned: 'unknown' })); }
+          if (!cancelled) { endCheck(); setHealthAsync(p => ({ ...p, aeDLCOwned: false })); }
           return;
         }
         const userDataPath = path.join(steamPath, 'userdata');
@@ -940,11 +1038,11 @@ function GameStatsPage({ api }) {
         if (!cancelled) {
           endCheck();
           setHealthAsync(p =>
-            p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: owned ? true : 'unknown' }
+            p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: owned ? true : false }
           );
         }
       } catch {
-        if (!cancelled) { endCheck(); setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: 'unknown' })); }
+        if (!cancelled) { endCheck(); setHealthAsync(p => (p.aeDLCOwnedManual ? p : { ...p, aeDLCOwned: false })); }
       }
     }
 
@@ -1406,6 +1504,9 @@ function GameStatsPage({ api }) {
   // Vortex update pending (non-beta)  
   const updatePending = healthAsync.updateAvailable === true;
 
+  const skseMod = Object.values(mods).find((m) => m.attributes?.scriptExtender === true && m.state === 'installed' && profile?.modState?.[m.id]?.enabled === true);
+  const skseVersion = skseMod?.attributes?.version;
+
   // SKSE64 as primary tool  
   // Tool IDs from script-extender-installer gameSupport.ts  
   const xseToolIdMap = {
@@ -1737,11 +1838,19 @@ function GameStatsPage({ api }) {
 
   const gameProfileCount = gameProfiles.length;
 
+  const engineInjectors = Object.values(mods).filter(
+    (mod) => mod.type === 'dinput' && mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true,
+
+  );
+  const engineInjectorCount = engineInjectors.length;
+  //  console.log('=====', JSON.stringify(engineInjectors, null, 2));
+
   const installedCollections = Object.values(mods).filter(
-    (mod) => mod.type === 'collection' && mod.state === 'installed' &&  profile?.modState?.[mod.id]?.enabled === true
+    (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
+
   );
   const collectionCount = installedCollections.length;
-
+  // console.log('=====', JSON.stringify(Object.values(mods).filter((mod) => mod.type === "collection"), null, 2));
   const mainCollectionAttributes = installedCollections.find(m => {
     const modName = util.renderModName(m) || m.id;
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure';
@@ -1755,8 +1864,8 @@ function GameStatsPage({ api }) {
 
   const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
   const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
-  
-  const expectedTotalPlugins =  healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs
+
+  const expectedTotalPlugins = healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs
   const expectedTotalMods = healthAsync.aeDLCOwned === true ? collRequiredMods + collOptionalMods : collRequiredMods
 
   function showUnmanagedDialog() {
@@ -1794,7 +1903,7 @@ function GameStatsPage({ api }) {
     );
   }
 
-  const faqItems = buildFaqItems(api, gamePath);
+  const faqItems = buildFaqItems(api, gamePath, activeGameId);
 
   //=========================== Render the page  ==========================================================
 
@@ -1865,10 +1974,10 @@ function GameStatsPage({ api }) {
             position: 'relative',
           }
         },
-          React.createElement('h2', null, `Support Stats - `, 
+          React.createElement('h2', null, `Support Stats `,
             baseCollectionName == 'Immersive & Pure' || baseCollectionName == 'Immersive & Adult'
-            ? `${baseCollectionName} Rev.${mainRevisionNumber}`
-            : 'non-Immersive Collection'),
+              ? `- ${baseCollectionName} Rev.${mainRevisionNumber}`
+              : null),
           row('v' + extensionVersion),
           row('Vortex Version: ', vortexVersion),
           React.createElement('div', {
@@ -1920,7 +2029,7 @@ function GameStatsPage({ api }) {
                     checked: healthAsync.aeDLCOwned === true,
                     onChange: (e) => {
                       const checked = e.target.checked;
-                      setHealthAsync(p => ({ ...p, aeDLCOwned: checked ? true : 'unknown', aeDLCOwnedManual: true }));
+                      setHealthAsync(p => ({ ...p, aeDLCOwned: checked ? true : false, aeDLCOwnedManual: true }));
                     },
                     style: { marginRight: '6px', verticalAlign: 'middle' },
                   }),
@@ -1946,7 +2055,7 @@ function GameStatsPage({ api }) {
                   // React.createElement('strong', null, 'Discovered Tools'),
                   expectedXseId !== undefined
                     ? React.createElement('div', { style: { marginBottom: '4px' } },
-                      React.createElement('strong', null, 'SKSE: '),
+                      React.createElement('strong', null, `SKSE(v${skseVersion}): `),
                       xseExistsAtExpected
                         ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(expectedXsePath))
 
@@ -2005,8 +2114,16 @@ function GameStatsPage({ api }) {
                     )
                     : null,
 
-                )
-              ),
+                ),
+                React.createElement('div', { style: { marginBottom: '10px' } },
+                  React.createElement('strong', null, 'Engine Injectors:'),
+                  engineInjectorCount > 0
+                    ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
+                      engineInjectors.map(injector => React.createElement('li', null, injector.attributes?.modName, ` - v${injector.attributes?.version.replace(/^v/, '')}`),))
+                    : ' None found',
+
+
+                ),),
             ),
             // Column 2  
             React.createElement('div', { style: { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '8px' } },
@@ -2026,8 +2143,8 @@ function GameStatsPage({ api }) {
                 React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used (No Links): '),
                 React.createElement('span', null, spaceNoLinksStr)
               ),
-              healthRow('VC++ x64', isVcppCurrent(runtimeInfo.vcx64), runtimeInfo.vcx64),
-              healthRow('VC++ x86', isVcppCurrent(runtimeInfo.vcx86), runtimeInfo.vcx86),
+              sysRow('VC++ x64', isVcppCurrent(runtimeInfo.vcx64), runtimeInfo.vcx64),
+              sysRow('VC++ x86', isVcppCurrent(runtimeInfo.vcx86), runtimeInfo.vcx86),
             ),
           ),
 
@@ -2037,7 +2154,7 @@ function GameStatsPage({ api }) {
             // Column 1
             React.createElement('div', { style: { flex: '1', justifyContent: 'right' } },
               React.createElement('strong', null,
-                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' } }, `${enabledModsCount}/${expectedTotalMods}`),),),
+                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' }, title: `Actual vs Expected mods for the ${baseCollectionName}` }, `${enabledModsCount}/${expectedTotalMods}`),),),
               row('Disabled Mods: ', `${disabledCount}`),
               row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
@@ -2057,7 +2174,21 @@ function GameStatsPage({ api }) {
                     `${name}: ${total} `, React.createElement('span', { style: { fontSize: '12px', opacity: 0.75 } }, `(${required} + ${optional})`),
                   );
                 }),
-                React.createElement('li', { key: '__none__' }, `None: ${noneCount}`)
+                React.createElement('li', { key: '__none__' },
+                  React.createElement('span', {
+                    style: { color: 'var(--color-primary-moderate)', cursor: 'pointer' },
+                    title: 'View Mods',
+                    onClick: () => {
+                      const batched = [
+                        actions.setGroupingAttribute('mods', null),
+                        actions.setAttributeFilter('mods', undefined, null),
+                        actions.setAttributeVisible('mods', 'collection', true),
+                        actions.setAttributeFilter('mods', 'collection', OptionsFilter.EMPTY),
+                      ];
+                      util.batchDispatch(api.store.dispatch, batched);
+                      api.events.emit("show-main-page", "Mods");
+                    },
+                  }, 'None: '), noneCount),
               ),),
 
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
@@ -2079,7 +2210,7 @@ function GameStatsPage({ api }) {
                 },
               },
                 // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
-                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' } },
+                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' }, title: `Actual vs Expected plugins for the ${baseCollectionName}` },
                   row('Total Active Plugins: ', `${activePlugins.length}`, `/${expectedTotalPlugins}`),
                   row('Disabled Plugins: ', disabledPlugins.length),),
                 React.createElement('div', null,
@@ -2255,15 +2386,15 @@ function GameStatsPage({ api }) {
                       : null),
 
                   healthRow(
-                    ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10))
+                    ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10))
                       ? null
-                      : `Creations/DLC missing: ${nativeCount}/${nativeExpected}`,
-                    (healthAsync.aeDLCOwned === true && nativeCount === 80) || (healthAsync.aeDLCOwned === 'unknown' && nativeCount === 10),
-                    aeDLCInstalled === null
-                      ? 'Checking...'
-                      : null,
+                      : `Creations/DLC mismatch: ${nativeCount}/${nativeExpected}`,
+                    (healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10),
+                    null,
                     null,
                     'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
+
+                  healthRow(nativeStatus, nativeStatus === null, null, scrollToSection('missingcc'), null),
 
                   healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
                     isRemovable
@@ -2339,8 +2470,47 @@ function GameStatsPage({ api }) {
                         : null,
                       null)
                     : null,
+                  ///////////////  
+                  healthRow(
+                    healthAsync.aeDLCOwned == true && collectionCounts[baseCollectionName].optional == 13
+                      ? null
+                      : healthAsync.aeDLCOwned != true && collectionCounts[baseCollectionName].optional == 13
+                        ? 'Optional Mods without DLC'
+                        : healthAsync.aeDLCOwned == true && collectionCounts[baseCollectionName].optional == 0
+                          ? 'Missing Optional Mods'
+                          : null,
 
-
+                    healthAsync.aeDLCOwned == true && collectionCounts[baseCollectionName].optional == 13 || healthAsync.aeDLCOwned != true && collectionCounts[baseCollectionName].optional == 0,
+                    null,
+                    () => {
+                      const batched = [
+                        actions.setAttributeFilter('collection-mods', undefined, null),
+                        actions.setGroupingAttribute('collection-mods', null),
+                        actions.setAttributeFilter('collection-mods', 'required', false),
+                      ];
+                      util.batchDispatch(api.store.dispatch, batched);
+                      // api.events.emit("show-main-page", "Collections");
+                      api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
+                    }, null),
+                  //////////////////
+                  healthRow((mainRevisionNumber == 100 && engineInjectorCount != 3) || (mainRevisionNumber == 99 && engineInjectorCount != 2)
+                    ? 'Check Engine Injector mods'
+                    : null,
+                    (mainRevisionNumber == 100 && engineInjectorCount == 3) || (mainRevisionNumber == 99 && engineInjectorCount == 2)
+                    , engineInjectorCount,
+                    () => {
+                      const batched = [
+                        actions.setAttributeFilter('mods', undefined, null),
+                        actions.setGroupingAttribute('mods', null),
+                        actions.setAttributeVisible('mods', 'modType', true),
+                        actions.setAttributeFilter('mods', 'modType', ["Engine Injector"]),
+                      ];
+                      util.batchDispatch(api.store.dispatch, batched);
+                      api.events.emit("show-main-page", "Mods");
+                    },
+                    engineInjectors.forEach((injector, index) => { }
+                      // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
+                    ),),
 
                   healthStatsBad == 0
                     ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" },
