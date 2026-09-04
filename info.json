@@ -1,7 +1,7 @@
 {
   "name": "Support Stats",
   "author": "Elsid2010",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "Collects important information and performs health checks useful for troublshooting.",
   "bundled": false
 }
