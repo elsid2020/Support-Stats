@@ -1847,7 +1847,7 @@ function GameStatsPage({ api }) {
 
   );
   const engineInjectorCount = engineInjectors.length;
-  
+  // console.log('====EnabledIEs', engineInjectors);
 
   const hasSwapper = engineInjectors.some(m =>
     (util.renderModName(m) || m.id).toLowerCase().includes('runtime swapper')
@@ -1858,9 +1858,9 @@ const hasPreloader = engineInjectors.some(m =>
 );
 
 const engineInjectorsGood = hasSwapper && hasPreloader;
-console.log('====GoodEIs', hasSwapper, hasPreloader);
-  console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
-console.log('=====', JSON.stringify(engineInjectors, null, 2));
+// console.log('====GoodEIs', hasSwapper, hasPreloader);
+ // console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
+//console.log('=====', JSON.stringify(engineInjectors, null, 2));
   const installedCollections = Object.values(mods).filter(
     (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
 
@@ -2135,7 +2135,7 @@ console.log('=====', JSON.stringify(engineInjectors, null, 2));
                   React.createElement('strong', null, 'Engine Injectors:'),
                   engineInjectorCount > 0
                     ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                      engineInjectors.map(injector => React.createElement('li', { key: injector.id }, injector.attributes?.modName, ` - v${injector.attributes?.version.replace(/^v/, '')}`),))
+                      engineInjectors.map(injector => React.createElement('li', { key: injector.id }, injector.attributes?.customFileName, ` - v${injector.attributes?.version.replace(/^v/, '')}`),))
                     : ' None found',
 
 
