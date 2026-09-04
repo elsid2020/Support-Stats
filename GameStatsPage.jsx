@@ -1,3 +1,4 @@
+const extensionVersion = "1.9.4";
 const React = require('react');
 const { useSelector, useDispatch } = require('react-redux');
 const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter } = require('vortex-api');
@@ -809,7 +810,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  const extensionVersion = "1.9.4";
+  
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -1990,7 +1991,7 @@ const engineInjectorsGood = hasSwapper && hasPreloader;
             position: 'relative',
           }
         },
-          React.createElement('h2', null, `Support Stats `,
+          React.createElement('h2', { style: { paddingRight: '220px' } }, `Support Stats `,
             baseCollectionName == 'Immersive & Pure' || baseCollectionName == 'Immersive & Adult'
               ? `- ${baseCollectionName} Rev.${mainRevisionNumber}`
               : null),
@@ -2207,9 +2208,7 @@ const engineInjectorsGood = hasSwapper && hasPreloader;
                   }, 'None: '), noneCount),
               ),),
 
-            React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
-              React.createElement('div', {}),
-            ),
+           
             //Column 2
 
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
