@@ -9,8 +9,8 @@ const { exec, execFile } = require('child_process');
 const { count } = require('console');
 const { json } = require('stream/consumers');
 const semver = require('semver');
-const IniParser = require('vortex-parse-ini').default;  
-const { WinapiFormat } = require('vortex-parse-ini');  
+const IniParser = require('vortex-parse-ini').default;
+const { WinapiFormat } = require('vortex-parse-ini');
 
 const iniFileMap = {
   skyrim: ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],
@@ -168,34 +168,34 @@ function getIniPaths(gameId) {
   return subPaths.map(p => path.join(docsPath, 'My Games', p));
 }
 
-function getSkyrimPrefsPath(gameId) {  
-  const paths = getIniPaths(gameId);  
-  return paths.find(p => p.toLowerCase().endsWith('skyrimprefs.ini'));  
-}  
-  
-async function setBFreebiesSeen(gameId, api) {  
-  const parser = new IniParser(new WinapiFormat());  
-  const iniPath = getSkyrimPrefsPath(gameId);  
-  
-  if (!iniPath) {  
-    api.showErrorNotification('Could not locate skyrimprefs.ini', new Error('No matching path found'), { allowReport: false });  
-    return;  
-  }  
-  
-  try {  
-    await fs.forcePerm(api.translate, () =>  
-      parser.read(iniPath).then((data) => {  
-        data.data.General = data.data.General || {};  
-        data.data.General.bFreebiesSeen = 0;  
-        return parser.write(iniPath, data);  
-      }),  
-    );  
-  } catch (err) {  
-    if (err instanceof util.UserCanceled) {  
+function getSkyrimPrefsPath(gameId) {
+  const paths = getIniPaths(gameId);
+  return paths.find(p => p.toLowerCase().endsWith('skyrimprefs.ini'));
+}
+
+async function setBFreebiesSeen(gameId, api) {
+  const parser = new IniParser(new WinapiFormat());
+  const iniPath = getSkyrimPrefsPath(gameId);
+
+  if (!iniPath) {
+    api.showErrorNotification('Could not locate skyrimprefs.ini', new Error('No matching path found'), { allowReport: false });
+    return;
+  }
+
+  try {
+    await fs.forcePerm(api.translate, () =>
+      parser.read(iniPath).then((data) => {
+        data.data.General = data.data.General || {};
+        data.data.General.bFreebiesSeen = 0;
+        return parser.write(iniPath, data);
+      }),
+    );
+  } catch (err) {
+    if (err instanceof util.UserCanceled) {
       return; // user dismissed the permission dialog, don't crash  
-    }  
-    api.showErrorNotification('Failed to update skyrimprefs.ini', err, { allowReport: false });  
-  }  
+    }
+    api.showErrorNotification('Failed to update skyrimprefs.ini', err, { allowReport: false });
+  }
 }
 
 function getCollectionStats(collectionMod, mods, profile) {
@@ -674,64 +674,65 @@ function buildFaqItems(api, gamePath, gameId) {
     {
       heading: 'Bethesda Creations',
       id: 'missingcc',
-      content: 
+      content:
         React.createElement('p', null,
           ul(
-        'Creation Club content ',
-        '━━━━━━━━━━━━━━━━━━━━',
-        'First off - Make sure the check box at the top of this page is set correctly. Auto detection of the AE DLC purchase isn\'t perfect. Simply add/remove the check as needed',
-        'Family sharing is not supported, you MUST own the AE DLC yourself if you choose to install the optional mods',
-        '━━━━━━━━━━━━━━━━━━━━',
-        'Are you receiving an error about missing masters or plugins that start with cc in the name, such as ccffbsse002-crossbowpack.esl and ccbgssse063-ba_ebony.esl and so on?',
-        '',
-        'This means you did one of the following:',
-        'A) You forgot to download the creation club content that comes with the game Anniversary Edition DLC you purchased. This content can only be downloaded in game.',
-        'B) You do not have Anniversary Edition DLC purchased, yet you installed all optional mods anyway.',
-        '<h3>REMEMBER: Creations aside from the 4 free, or the AE DLC ARE NOT SUPPORTED. DO NOT INSTALL THEM</h3>',
-        '━━━━━━━━━━━━━━━━━━━━',
-        ' How To Fix',
-        '<h1>A) IF YOU OWN AE DLC</h1>',),
-        React.createElement('span', null, React.createElement('button', {
-          className: 'btn btn-default',
-          onClick: () => {setBFreebiesSeen(gameId, api)}
-        },'Click to Download DLC on next start'), '   -OR-'),
-      ul(
-        '1) In Vortex, go to the Mods tab, and hit the Purge Mods button. Wait for it to finish.',
-        '2) Go to Steam and launch Skyrim as if it was unmodded via the vanilla launcher.',
-        'You may get a popup asking if you want to download content. If you get it, confirm it. But if you don\'t, go to Creation Club menu.',
-        '3) Click Options at the bottom. Then click "Download All Owned Creation Club Content" DO NOT ALT-TAB from the game, as that can break the download process. Before quitting creations menu, check these 2 creations manually and make sure they are installed as well just in case you fail to get them:',
-        'The Dwarven Armored Mudcrab',
-        'Alternative Armors - Elven Hunter',
-        '4) Once finished, close the game, go back to Vortex, and click Deploy Mods in the Mods tab. Wait for it to finish.',
-        '5) In the Plugins tab, click Sort Now. Wait for the spinning wheels to disappear.',
-        '6) Make sure you don\'t have any Vortex notifications anymore, then launch the game via SKSE again.',
-        '',
-        '<h1>B) IF YOU DON\'T OWN AE DLC</h1>',),
-        React.createElement('button', {
-          className: 'btn btn-default',
-          onClick: () => {
-                     const batched = [
-                        actions.setAttributeFilter('collection-mods', undefined, null),
-                        actions.setGroupingAttribute('collection-mods', null),
-                        actions.setAttributeFilter('collection-mods', 'required', false),
-                      ];
-                      util.batchDispatch(api.store.dispatch, batched);
-                      // api.events.emit("show-main-page", "Collections");
-                      api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods")}
-                    },'Open the I&A collections tab'),
-      ul(
-      'You have installed the optional mods and they need to be disabled by following these steps:',
-      '1) Go to the collections tab in Vortex',
-      '2) Hover the collection and click the view button',
-      '3) In the Collection Mod that opens change the required fitler to "Recommended"',
-      '4) Disable all of the listed mods',
-      '5) Restart Vortex',
-      '6) Go to the mods tab and click the Purge button',
-      '7) On the same tab click the Deploy button',
-      '8) Go to the plugins tab and make sure ALL plugins are enabled',
-      '9) Click the Sort now button',
-      
-      ),)
+            'Creation Club content ',
+            '━━━━━━━━━━━━━━━━━━━━',
+            'First off - Make sure the check box at the top of this page is set correctly. Auto detection of the AE DLC purchase isn\'t perfect. Simply add/remove the check as needed',
+            'Family sharing is not supported, you MUST own the AE DLC yourself if you choose to install the optional mods',
+            '━━━━━━━━━━━━━━━━━━━━',
+            'Are you receiving an error about missing masters or plugins that start with cc in the name, such as ccffbsse002-crossbowpack.esl and ccbgssse063-ba_ebony.esl and so on?',
+            '',
+            'This means you did one of the following:',
+            'A) You forgot to download the creation club content that comes with the game Anniversary Edition DLC you purchased. This content can only be downloaded in game.',
+            'B) You do not have Anniversary Edition DLC purchased, yet you installed all optional mods anyway.',
+            '<h3>REMEMBER: Creations aside from the 4 free, or the AE DLC ARE NOT SUPPORTED. DO NOT INSTALL THEM</h3>',
+            '━━━━━━━━━━━━━━━━━━━━',
+            ' How To Fix',
+            '<h1>A) IF YOU OWN AE DLC</h1>',),
+          React.createElement('span', null, React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => { setBFreebiesSeen(gameId, api) }
+          }, 'Click to Download DLC on next start'), '   -OR-'),
+          ul(
+            '1) In Vortex, go to the Mods tab, and hit the Purge Mods button. Wait for it to finish.',
+            '2) Go to Steam and launch Skyrim as if it was unmodded via the vanilla launcher.',
+            'You may get a popup asking if you want to download content. If you get it, confirm it. But if you don\'t, go to Creation Club menu.',
+            '3) Click Options at the bottom. Then click "Download All Owned Creation Club Content" DO NOT ALT-TAB from the game, as that can break the download process. Before quitting creations menu, check these 2 creations manually and make sure they are installed as well just in case you fail to get them:',
+            'The Dwarven Armored Mudcrab',
+            'Alternative Armors - Elven Hunter',
+            '4) Once finished, close the game, go back to Vortex, and click Deploy Mods in the Mods tab. Wait for it to finish.',
+            '5) In the Plugins tab, click Sort Now. Wait for the spinning wheels to disappear.',
+            '6) Make sure you don\'t have any Vortex notifications anymore, then launch the game via SKSE again.',
+            '',
+            '<h1>B) IF YOU DON\'T OWN AE DLC</h1>',),
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => {
+              const batched = [
+                actions.setAttributeFilter('collection-mods', undefined, null),
+                actions.setGroupingAttribute('collection-mods', null),
+                actions.setAttributeFilter('collection-mods', 'required', false),
+              ];
+              util.batchDispatch(api.store.dispatch, batched);
+              // api.events.emit("show-main-page", "Collections");
+              api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods")
+            }
+          }, 'Open the I&A collections tab'),
+          ul(
+            'You have installed the optional mods and they need to be disabled by following these steps:',
+            '1) Go to the collections tab in Vortex',
+            '2) Hover the collection and click the view button',
+            '3) In the Collection Mod that opens change the required fitler to "Recommended"',
+            '4) Disable all of the listed mods',
+            '5) Restart Vortex',
+            '6) Go to the mods tab and click the Purge button',
+            '7) On the same tab click the Deploy button',
+            '8) Go to the plugins tab and make sure ALL plugins are enabled',
+            '9) Click the Sort now button',
+
+          ),)
     },
 
   ];
@@ -1716,13 +1717,16 @@ function GameStatsPage({ api }) {
   }, [mods, refreshKey]);
 
   const enabledModIds = Object.keys(profile?.modState || {}).filter(
-    (modId) => profile.modState[modId]?.enabled === true
+    (modId) => profile.modState[modId]?.enabled === true,
+
   );
   const enabledModsCount = enabledModIds.length;
   const regularMods = Object.values(mods).filter(m => m.type !== 'collection');
   const disabledCount = regularMods.filter(m =>
     m.state === 'installed' && profile?.modState?.[m.id]?.enabled !== true
   ).length;
+
+  // console.log('====', enabledModIds.join('\n'));
 
   const collectionCounts = {}; // name -> { total, required, optional }  
   let noneCount = 0;
@@ -1843,8 +1847,20 @@ function GameStatsPage({ api }) {
 
   );
   const engineInjectorCount = engineInjectors.length;
-  //  console.log('=====', JSON.stringify(engineInjectors, null, 2));
+  
 
+  const hasSwapper = engineInjectors.some(m =>
+    (util.renderModName(m) || m.id).toLowerCase().includes('runtime swapper')
+);
+
+const hasPreloader = engineInjectors.some(m =>
+    (util.renderModName(m) || m.id).toLowerCase().includes('engine fixes - skse64 preloader')
+);
+
+const engineInjectorsGood = hasSwapper && hasPreloader;
+console.log('====GoodEIs', hasSwapper, hasPreloader);
+  console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
+console.log('=====', JSON.stringify(engineInjectors, null, 2));
   const installedCollections = Object.values(mods).filter(
     (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
 
@@ -2119,7 +2135,7 @@ function GameStatsPage({ api }) {
                   React.createElement('strong', null, 'Engine Injectors:'),
                   engineInjectorCount > 0
                     ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                      engineInjectors.map(injector => React.createElement('li', null, injector.attributes?.modName, ` - v${injector.attributes?.version.replace(/^v/, '')}`),))
+                      engineInjectors.map(injector => React.createElement('li', { key: injector.id }, injector.attributes?.modName, ` - v${injector.attributes?.version.replace(/^v/, '')}`),))
                     : ' None found',
 
 
@@ -2470,47 +2486,55 @@ function GameStatsPage({ api }) {
                         : null,
                       null)
                     : null,
-                  ///////////////  
-                  healthRow(
-                    healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
-                      ? null
-                      : healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
-                        ? 'Optional Mods without DLC'
-                        : healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
-                          ? 'Missing Optional Mods'
-                          : null,
+                  baseCollectionName
+                    ? healthRow(
+                      healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
+                        ? null
+                        : healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
+                          ? 'Optional Mods without DLC'
+                          : healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
+                            ? 'Missing Optional Mods'
+                            : null,
 
-                    healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13 || healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0,
-                    null,
-                    () => {
-                      const batched = [
-                        actions.setAttributeFilter('collection-mods', undefined, null),
-                        actions.setGroupingAttribute('collection-mods', null),
-                        actions.setAttributeFilter('collection-mods', 'required', false),
-                      ];
-                      util.batchDispatch(api.store.dispatch, batched);
-                      // api.events.emit("show-main-page", "Collections");
-                      api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
-                    }, null),
-                  //////////////////
-                  healthRow((mainRevisionNumber == 100 && engineInjectorCount != 3) || (mainRevisionNumber == 99 && engineInjectorCount != 2)
-                    ? 'Check Engine Injector mods'
+                      (healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13) ||
+                      (healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0),
+                      null,
+                      () => {
+                        const batched = [
+                          actions.setAttributeFilter('collection-mods', undefined, null),
+                          actions.setGroupingAttribute('collection-mods', null),
+                          actions.setAttributeFilter('collection-mods', 'required', false),
+                        ];
+                        util.batchDispatch(api.store.dispatch, batched);
+                        api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
+                      },
+                      null,
+                    )
                     : null,
-                    (mainRevisionNumber == 100 && engineInjectorCount == 3) || (mainRevisionNumber == 99 && engineInjectorCount == 2)
-                    , engineInjectorCount,
-                    () => {
-                      const batched = [
-                        actions.setAttributeFilter('mods', undefined, null),
-                        actions.setGroupingAttribute('mods', null),
-                        actions.setAttributeVisible('mods', 'modType', true),
-                        actions.setAttributeFilter('mods', 'modType', ["Engine Injector"]),
-                      ];
-                      util.batchDispatch(api.store.dispatch, batched);
-                      api.events.emit("show-main-page", "Mods");
-                    },
-                    engineInjectors.forEach((injector, index) => { }
-                      // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
-                    ),),
+
+                  baseCollectionName
+                    // ? healthRow((mainRevisionNumber == 100 && engineInjectorCount < 3) || (mainRevisionNumber == 99 && engineInjectorCount < 2)
+                    ? healthRow(engineInjectorsGood
+                      ? null
+                      : 'Engine Injector mod missing',
+                      engineInjectorsGood,
+                      null,
+                      engineInjectorsGood
+                        ? null
+                        : () => {
+                          const batched = [
+                            actions.setAttributeFilter('mods', undefined, null),
+                            actions.setGroupingAttribute('mods', null),
+                            actions.setAttributeVisible('mods', 'modType', true),
+                            actions.setAttributeFilter('mods', 'modType', ["Engine Injector"]),
+                          ];
+                          util.batchDispatch(api.store.dispatch, batched);
+                          api.events.emit("show-main-page", "Mods");
+                        },
+                      engineInjectors.forEach((injector, index) => { }
+                        // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
+                      ),)
+                    : null,
 
                   healthStatsBad == 0
                     ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" },
