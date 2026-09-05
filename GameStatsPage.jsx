@@ -1858,7 +1858,7 @@ const hasPreloader = engineInjectors.some(m =>
     (util.renderModName(m) || m.id).toLowerCase().includes('engine fixes - skse64 preloader')
 );
 
-const engineInjectorsGood = hasSwapper && hasPreloader;
+
 // console.log('====GoodEIs', hasSwapper, hasPreloader);
  // console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
 //console.log('=====', JSON.stringify(engineInjectors, null, 2));
@@ -1878,6 +1878,13 @@ const engineInjectorsGood = hasSwapper && hasPreloader;
     ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
     : undefined;
 
+  const engineInjectorsGood = (
+  mainRevisionNumber == '99' 
+  ? hasPreloader
+  : mainRevisionNumber == '100'
+    ? hasSwapper && hasPreloader
+    : false
+  );
 
   const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
   const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
