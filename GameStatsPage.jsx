@@ -51,7 +51,7 @@ const expectedModCountMap = {
   'Immersive & Adult99': [547, 13],
   'Immersive & Adult100': [555, 13],
   'Immersive & Pure11': [477, 12],
-  'Immersive & Pure12': [482, 13],
+  'Immersive & Pure12': [483, 13],
 };
 
 const supportedRevisions = {
