@@ -264,7 +264,7 @@ function statusIcon(isOk) {
   return React.createElement('svg', {
     viewBox: '0 0 24 24',
     style: {
-      width: '24px', height: '24px',
+      width: '18px', height: '18px',
       fill: isOk ? '#4caf50' : '#f44336',
       flexShrink: 0, marginRight: '6px', verticalAlign: 'text'
     }
@@ -306,7 +306,7 @@ function sysRow(label, version, isCurrent) {
 
 function reallyGoodRow(label) {
   return React.createElement('div', {
-    style: { display: 'flex', alignItems: 'left', marginBottom: '4px', fontSize: '18px' }
+    style: { display: 'flex', alignItems: 'center', marginBottom: '4px', fontSize: '18px' }
   },
     React.createElement(statusIcon, null, null),
     React.createElement('span', null, label)
@@ -2193,7 +2193,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
             // Column 1
             React.createElement('div', { style: { flex: '1', justifyContent: 'right' } },
               React.createElement('strong', null,
-                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' }, title: collRequiredMods != 0 ? `Actual vs Expected mods for the ${baseCollectionName}` : "Enabled Mods Count" }, collRequiredMods != 0 ? `${enabledModsCount}/${expectedTotalMods}` : enabledModsCount),),),
+                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' }, title: collRequiredMods != 0 ? `Actual vs Expected mods for ${baseInstalledCollection}` : "Enabled Mods Count" }, collRequiredMods != 0 ? `${enabledModsCount}/${expectedTotalMods}` : enabledModsCount),),),
               row('Disabled Mods: ', `${disabledCount}`),
               row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
@@ -2247,7 +2247,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
                 },
               },
                 // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
-                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' }, title: `Plugins for the ${baseCollectionName}` },
+                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' }, title: `Plugins for ${baseInstalledCollection}` },
                   row('Total Active Plugins: ', `${activePlugins.length}`, collRequiredPlugs != 0 ? `/${expectedTotalPlugins}` : null),
                   row('Disabled Plugins: ', disabledPlugins.length),),
                 React.createElement('div', null,
@@ -2585,7 +2585,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
                     : null,
 
                     healthStatsBad == 0
-                      ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" },
+                      ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '2' }, title: "No obvious problems found" },
                         reallyGoodRow("Health Stats look good!"))
                       : null,
 
