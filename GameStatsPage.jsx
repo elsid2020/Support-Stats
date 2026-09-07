@@ -44,17 +44,20 @@ const expectedPluginCountMap = {
   'Immersive & Adult99': [440, 92],
   'Immersive & Adult100': [440, 92],
   'Immersive & Pure11': [396, 91],
-  'Immersive & Pure12': [396, 91],
+  'Immersive & Pure12': [392, 93],
 };
 
 const expectedModCountMap = {
   'Immersive & Adult99': [547, 13],
   'Immersive & Adult100': [555, 13],
   'Immersive & Pure11': [477, 12],
-  'Immersive & Pure12': [0, 0],
+  'Immersive & Pure12': [482, 13],
 };
 
-
+const supportedRevisions = {
+  'Immersive & Adult': ['99', '100'],
+  'Immersive & Pure': ['11', '12'],
+};
 
 
 
@@ -319,7 +322,9 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
     healthStatsBad++;;
     const icon = isGood
       ? null //React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
-      : React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start', fontSize: '14pt' } }, '✘');
+      : label
+        ? React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start', fontSize: '14pt' } }, '✘')
+        : null;
 
 
     return React.createElement('div', {
@@ -344,7 +349,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
       detail
         ? React.createElement('span', { style: { marginLeft: '6px', opacity: 0.7, fontSize: '0.85em', alignItems: 'flex-start' } }, detail)
         : null,
-      !isGood && onClick != null
+      !isGood && onClick != null && label
         ? React.createElement('svg', {
           viewBox: '0 0 24 24',
           style: {
@@ -810,7 +815,7 @@ function openScreenshotTool() {
 *
 ===================================================================================================================*/
 function GameStatsPage({ api }) {
-  
+
   const vortexVersion = useSelector((state) => state?.app?.appVersion || 'Unknown');
   const activeGameId = useSelector((state) => selectors.activeGameId(state));
   const game = activeGameId ? util.getGame(activeGameId) : null;
@@ -883,6 +888,9 @@ function GameStatsPage({ api }) {
     : 'Unknown';
 
   const [healthAsync, setHealthAsync] = useState({
+    enabled: true,
+    vcppVersion: null,
+    vcppCurrent: null,
     updateAvailable: null,
     updateVersion: null,
     iniPresent: false,
@@ -1852,16 +1860,16 @@ function GameStatsPage({ api }) {
 
   const hasSwapper = engineInjectors.some(m =>
     (util.renderModName(m) || m.id).toLowerCase().includes('runtime swapper')
-);
+  );
 
-const hasPreloader = engineInjectors.some(m =>
+  const hasPreloader = engineInjectors.some(m =>
     (util.renderModName(m) || m.id).toLowerCase().includes('engine fixes - skse64 preloader')
-);
+  );
 
 
-// console.log('====GoodEIs', hasSwapper, hasPreloader);
- // console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
-//console.log('=====', JSON.stringify(engineInjectors, null, 2));
+  // console.log('====GoodEIs', hasSwapper, hasPreloader);
+  // console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
+  //console.log('=====', JSON.stringify(engineInjectors, null, 2));
   const installedCollections = Object.values(mods).filter(
     (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
 
@@ -1873,23 +1881,30 @@ const hasPreloader = engineInjectors.some(m =>
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure';
 
   },);
-  const mainRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
+  const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
   const baseCollectionName = mainCollectionAttributes
     ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
     : undefined;
 
   const engineInjectorsGood = (
-  mainRevisionNumber == '99' 
-  ? hasPreloader
-  : mainRevisionNumber == '100'
-    ? hasSwapper && hasPreloader
-    : false
+    baseRevisionNumber == '99' || baseRevisionNumber == '11'
+      ? hasPreloader
+      : baseRevisionNumber == '100' || baseRevisionNumber == '12'
+        ? hasSwapper && hasPreloader
+        : false
   );
 
-  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
-  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + mainRevisionNumber] ?? [0, 0];
+  const baseInstalledCollection = baseCollectionName + ' ' +baseRevisionNumber;
+  
+  const validBaseCollection = Object.entries(supportedRevisions).some(
+    ([collection, revisions]) => `${collection} ${baseRevisionNumber}` === baseInstalledCollection // &&
+    // revisions.includes(baseRevisionNumber)
+  );
+console.log('====base, valid', baseInstalledCollection, validBaseCollection);
+  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
+  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
 
-  const expectedTotalPlugins = healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs
+  const expectedTotalPlugins = healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs + nativeExpected;
   const expectedTotalMods = healthAsync.aeDLCOwned === true ? collRequiredMods + collOptionalMods : collRequiredMods
 
   function showUnmanagedDialog() {
@@ -2000,7 +2015,7 @@ const hasPreloader = engineInjectors.some(m =>
         },
           React.createElement('h2', { style: { paddingRight: '220px' } }, `Support Stats `,
             baseCollectionName == 'Immersive & Pure' || baseCollectionName == 'Immersive & Adult'
-              ? `- ${baseCollectionName} Rev.${mainRevisionNumber}`
+              ? `- ${baseCollectionName} Rev.${baseRevisionNumber}`
               : null),
           row('v' + extensionVersion),
           row('Vortex Version: ', vortexVersion),
@@ -2167,8 +2182,8 @@ const hasPreloader = engineInjectors.some(m =>
                 React.createElement('span', { style: { fontWeight: 'bold' } }, 'Space Used (No Links): '),
                 React.createElement('span', null, spaceNoLinksStr)
               ),
-              sysRow('VC++ x64', isVcppCurrent(runtimeInfo.vcx64), runtimeInfo.vcx64),
-              sysRow('VC++ x86', isVcppCurrent(runtimeInfo.vcx86), runtimeInfo.vcx86),
+              sysRow('VC++ x64', runtimeInfo.vcx64, isVcppCurrent(runtimeInfo.vcx64)),
+              sysRow('VC++ x86', runtimeInfo.vcx86, isVcppCurrent(runtimeInfo.vcx86)),
             ),
           ),
 
@@ -2178,7 +2193,7 @@ const hasPreloader = engineInjectors.some(m =>
             // Column 1
             React.createElement('div', { style: { flex: '1', justifyContent: 'right' } },
               React.createElement('strong', null,
-                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' }, title: `Actual vs Expected mods for the ${baseCollectionName}` }, `${enabledModsCount}/${expectedTotalMods}`),),),
+                React.createElement('div', null, 'Enabled Mods: ', React.createElement('span', { style: { fontWeight: '400' }, title: collRequiredMods != 0 ? `Actual vs Expected mods for the ${baseCollectionName}` : "Enabled Mods Count" }, collRequiredMods != 0 ? `${enabledModsCount}/${expectedTotalMods}` : enabledModsCount),),),
               row('Disabled Mods: ', `${disabledCount}`),
               row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
@@ -2215,7 +2230,7 @@ const hasPreloader = engineInjectors.some(m =>
                   }, 'None: '), noneCount),
               ),),
 
-           
+
             //Column 2
 
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
@@ -2232,8 +2247,8 @@ const hasPreloader = engineInjectors.some(m =>
                 },
               },
                 // StatusIcon({ type: pluginsProper ? 'success' : 'error', style: { marginRight: '6px' } }),
-                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' }, title: `Actual vs Expected plugins for the ${baseCollectionName}` },
-                  row('Total Active Plugins: ', `${activePlugins.length}`, `/${expectedTotalPlugins}`),
+                React.createElement('div', { style: { borderRight: '1px solid #797373', marginRight: '3px', paddingRight: '10px' }, title: `Plugins for the ${baseCollectionName}` },
+                  row('Total Active Plugins: ', `${activePlugins.length}`, collRequiredPlugs != 0 ? `/${expectedTotalPlugins}` : null),
                   row('Disabled Plugins: ', disabledPlugins.length),),
                 React.createElement('div', null,
                   row('Full Plugins: ', `${regularPlugins.length} / ${regularLimit}`),
@@ -2301,226 +2316,252 @@ const hasPreloader = engineInjectors.some(m =>
         ),
 
         // ── Health Checks ──────────────────────────────────────────────────────────  
+        React.createElement('label', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+          React.createElement('input', {
+            type: 'checkbox',
+            default: 'checked',
+            checked: healthAsync.enabled === true,
+            onChange: (e) => {
+              const checked = e.target.checked;
+              setHealthAsync(p => ({ ...p, enabled: checked ? true : false }));
+            },
+            style: { marginRight: '6px', verticalAlign: 'middle' },
+          }),
+          React.createElement('span', { style: { position: 'relative', top: '3px' }, title: 'Enable or disable health checks for this game' },
+            'Health Stats Enabled - Once your base collection is working and you start to alter it, you can disable these checks if wanted. Some are still useful though.',
 
-        React.createElement('div', {
-          style: {
-            border: '2px solid orange',
-            borderRadius: '6px',
-            padding: '12px',
-            marginBottom: '16px',
-          }
-        },
-          React.createElement('div', {
+          )
+        ),
+
+        healthAsync.enabled
+          ? React.createElement('div', {
             style: {
-              display: 'flex',
-              // alignItems: 'center',      // vertically align header/button/columns on the same line  
-              flexWrap: 'wrap',          // allow the columns to drop below if there's no room  
-              gap: '12px',
-              marginBottom: '12px',
+              border: '2px solid orange',
+              borderRadius: '6px',
+              padding: '12px',
+              marginBottom: '16px',
             }
           },
-            // Left side: header stacked above button  
             React.createElement('div', {
               style: {
                 display: 'flex',
-                flexDirection: 'column',
-                marginRight: '16px', // gap between this stack and the columns  
+                // alignItems: 'center',      // vertically align header/button/columns on the same line  
+                flexWrap: 'wrap',          // allow the columns to drop below if there's no room  
+                gap: '12px',
+                marginBottom: '12px',
               }
             },
-              React.createElement('h3', { style: { width: 'fit-content', marginTop: 0, marginBottom: '8px' } }, 'Health Stats'),
-              React.createElement('button', {
-                onClick: () => setRefreshKey(k => k + 1),
-                className: 'btn btn-default btn-xs',
-                style: { marginBottom: 0, width: 'fit-content' },
-              }, 'Refresh')
-            ),
-
-            !settled
-              ? React.createElement('div', {
+              // Left side: header stacked above button  
+              React.createElement('div', {
                 style: {
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginLeft: '20px',
-                  flex: 1,
-                  minHeight: '120px',  // give the box enough height to actually center within  
-                  borderLeft: '2px solid orange',
-                  marginBottom: '-10px',
-
+                  flexDirection: 'column',
+                  marginRight: '16px', // gap between this stack and the columns  
                 }
               },
-                React.createElement(Spinner, {
-                  className: 'health-check-spinner',
+                React.createElement('h3', { style: { width: 'fit-content', marginTop: 0, marginBottom: '8px' } }, 'Health Stats'),
+                React.createElement('button', {
+                  onClick: () => setRefreshKey(k => k + 1),
+                  className: 'btn btn-default btn-xs',
+                  style: { marginBottom: 0, width: 'fit-content' },
+                }, 'Refresh')
+              ),
+
+              !settled
+                ? React.createElement('div', {
                   style: {
-                    width: '24px',
-                    height: '24px',
-                    opacity: 0.4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginLeft: '20px',
+                    flex: 1,
+                    minHeight: '120px',  // give the box enough height to actually center within  
+                    borderLeft: '2px solid orange',
+                    marginBottom: '-10px',
+
                   }
-                })
-              )
-              : React.createElement('div', {
-                style: {
-                  display: 'flex',
-                  justifyContent: 'center',
-                  flex: 1,
-                  borderLeft: '2px solid orange',
-                  marginBottom: '-10px',
-                }
-              },
-                // Column 1  
-                React.createElement('div', {
-                  style: {
-                    display: 'grid',
-                    //gridAutoFlow: 'column',
-                    // gridTemplateRows: 'repeat(6, auto)',
-                    gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
-                    // columnGap: '16px',
-                    //rowGap: '0px',
-                  },
                 },
+                  React.createElement(Spinner, {
+                    className: 'health-check-spinner',
+                    style: {
+                      width: '24px',
+                      height: '24px',
+                      opacity: 0.4,
+                    }
+                  })
+                )
+                : React.createElement('div', {
+                  style: {
+                    display: 'flex',
+                    justifyContent: 'center',
+                    flex: 1,
+                    borderLeft: '2px solid orange',
+                    marginBottom: '-10px',
+                  }
+                },
+                  // Column 1  
+                  React.createElement('div', {
+                    style: {
+                      display: 'grid',
+                      //gridAutoFlow: 'column',
+                      // gridTemplateRows: 'repeat(6, auto)',
+                      gridTemplateColumns: 'repeat(3, 1fr)', // change 3 to however many columns you want  
+                      // columnGap: '16px',
+                      //rowGap: '0px',
+                    },
+                  },
 
-                  // React.createElement('div', { style: { gridColumn: '1' } },
+                    // React.createElement('div', { style: { gridColumn: '1' } },
 
-                  healthRow(isDeployed ? null : 'Mods Not Deployed', isDeployed, null,
-                    !isDeployed
-                      ? () => api.events.emit("show-main-page", "Mods")
-                      : null, "Jump to Mods tab"),
+                    healthRow(isDeployed ? null : 'Mods Not Deployed', isDeployed, null,
+                      !isDeployed
+                        ? () => api.events.emit("show-main-page", "Mods")
+                        : null, "Jump to Mods tab"),
 
-                  healthRow(pluginsSorted ? null : 'Plugins Not Sorted', pluginsSorted, null,
-                    !pluginsSorted
-                      ? () => api.events.emit("show-main-page", "gamebryo-plugins")
-                      : null, "Jump to Plugins tab"),
+                    healthRow(pluginsSorted ? null : 'Plugins Not Sorted', pluginsSorted, null,
+                      !pluginsSorted
+                        ? () => api.events.emit("show-main-page", "gamebryo-plugins")
+                        : null, "Jump to Plugins tab"),
 
-                  healthRow(gameLaunched ? null : 'INI Files Not Present', gameLaunched, false,
-                    !gameLaunched
-                      ? scrollToSection('notlaunchedthegame')
-                      : null,
-                    !gameLaunched
-                      ? 'You failed to launch the game before you modded it. Click for details.'
-                      : null),
 
-                  healthRow(!hasOneDrive ? null : 'OneDrive found in INI Path', !hasOneDrive, false,
-                    hasOneDrive
-                      ? scrollToSection('removeonedrive')
-                      : null,
-                    hasOneDrive
-                      ? 'OneDrive found. Click to learn how to remove it.'
-                      : null),
 
-                  healthRow(
-                    ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10))
-                      ? null
-                      : `Creations/DLC mismatch: ${nativeCount}/${nativeExpected}`,
-                    (healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10),
-                    null,
-                    null,
-                    'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
-
-                  healthRow(nativeStatus, nativeStatus === null, null, scrollToSection('missingcc'), null),
-
-                  healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
-                    isRemovable
-                      ? scrollToSection('externaldrive')
-                      : null,
-                    isRemovable
-                      ? "Removable drives are not suppoted. Click for details"
-                      : null),
-
-                  healthRow(!updatePending ? null : 'Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
-                    healthAsync.updateAvailable === null
-                      ? 'Checking...'
-                      : healthAsync.updateAvailable && healthAsync.updateVersion
-                        ? `${healthAsync.updateVersion} Pending`
-                        : 'Vortex is up to date'),
-
-                  healthRow(
-                    healthAsync.activatorType === "Hardlinks" ? null : 'Experimental Deployment Method: ' + healthAsync.activatorType,
-                    healthAsync.activatorType === "Hardlinks", null,
-                    healthAsync.activatorType !== "Hardlinks"
-                      ? () => {
-                        api.events.emit("show-main-page", "game_settings");
-                        api.store.dispatch(actions.setSettingsPage("Mods"))
-                      }
-                      : null,
-                    healthAsync.activatorType !== "Hardlinks"
-                      ? "Open Game Settings"
-                      : null
-                  ),
-
-                  healthRow(isXsePrimary ? null : 'SKSE64 Not Default Launcher', isXsePrimary, false,
-                    !isXsePrimary
-                      ? () => api.events.emit("show-main-page", "tools_page")
-                      : null, "Jump to Tools tab"),
-
-                  healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
-                    fnisOrNemesisDetected
-                      ? scrollToSection('removefnis')
-                      : null,
-                    fnisOrNemesisDetected
-                      ? 'FNIS and Nemesis are not used. Click for details.'
-                      : null),
-
-                  healthRow(!hasUnmanagedFiles ? null : 'Unmanaged files found', !hasUnmanagedFiles,
-                    unmanagedFiles.loading
-                      ? 'Scanning...'
-                      : hasUnmanagedFiles ? `${totalUnmanaged}` : null,
-                    hasUnmanagedFiles
-                      ? showUnmanagedDialog
-                      : null,
-                    hasUnmanagedFiles
-                      ? 'Click here to see a list of unmanaged files'
-                      : null),
-
-                  healthRow(suppressedCount === 0 ? null : 'Suppressed Notifications',
-                    suppressedCount === 0,
-                    suppressedCount > 0 ? suppressedCount : null,
-                    suppressedCount > 0
-                      ? () => {
-                        suppressedIds.forEach(id =>
-                          api.suppressNotification?.(id, false));
-                        api.events.emit('trigger-test-run', 'gamemode-activated');
-                      }
-                      : null,
-                    suppressedCount > 0 ? tooltipText : null),
-
-                  !srsInstalled  // Skip the contentcatalog check if using SRS
-                    ? healthRow(
-                      !contentCatalogCheck ? null : 'Incompatible contentcatalog',
-                      !contentCatalogCheck, null,
-                      contentCatalogCheck
-                        ? scrollToSection('newcontentcatalog')
+                    healthRow(!hasOneDrive ? null : 'OneDrive found in INI Path', !hasOneDrive, false,
+                      hasOneDrive
+                        ? scrollToSection('removeonedrive')
                         : null,
-                      null)
-                    : null,
-                  baseCollectionName
-                    ? healthRow(
+                      hasOneDrive
+                        ? 'OneDrive found. Click to learn how to remove it.'
+                        : null),
+                    healthRow(!updatePending ? null : 'Vortex Update Pending', !updatePending, healthAsync.updateAvailable === null, null,
+                      healthAsync.updateAvailable === null
+                        ? 'Checking...'
+                        : healthAsync.updateAvailable && healthAsync.updateVersion
+                          ? `${healthAsync.updateVersion} Pending`
+                          : 'Vortex is up to date'),
+
+                    healthRow(!hasUnmanagedFiles ? null : 'Unmanaged files found', !hasUnmanagedFiles,
+                      unmanagedFiles.loading
+                        ? 'Scanning...'
+                        : hasUnmanagedFiles ? `${totalUnmanaged}` : null,
+                      hasUnmanagedFiles
+                        ? showUnmanagedDialog
+                        : null,
+                      hasUnmanagedFiles
+                        ? 'Click here to see a list of unmanaged files'
+                        : null),
+
+                    healthRow(suppressedCount === 0 ? null : 'Suppressed Notifications',
+                      suppressedCount === 0,
+                      suppressedCount > 0 ? suppressedCount : null,
+                      suppressedCount > 0
+                        ? () => {
+                          suppressedIds.forEach(id =>
+                            api.suppressNotification?.(id, false));
+                          api.events.emit('trigger-test-run', 'gamemode-activated');
+                        }
+                        : null,
+                      suppressedCount > 0 ? tooltipText : null),
+
+
+                    // ================================================== Base Collection Health Checks ==========================================================
+
+
+                    validBaseCollection
+                      ? [
+                        healthRow(
+                        ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10))
+                          ? null
+                          : `Creations/DLC mismatch: ${nativeCount}/${nativeExpected}`,
+                        (healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10),
+                        null,
+                        null,
+                        'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
+
+                    healthRow(gameLaunched ? null : 'INI Files Not Present', gameLaunched, false,
+                      !gameLaunched
+                        ? scrollToSection('notlaunchedthegame')
+                        : null,
+                      !gameLaunched
+                        ? 'You failed to launch the game before you modded it. Click for details.'
+                        : null),
+
+                    healthRow(nativeStatus, nativeStatus === null, null, scrollToSection('missingcc'), null),
+
+                    healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
+                      isRemovable
+                        ? scrollToSection('externaldrive')
+                        : null,
+                      isRemovable
+                        ? "Removable drives are not suppoted. Click for details"
+                        : null),
+
+                    healthRow(
+                      healthAsync.activatorType === "Hardlinks" ? null : 'Experimental Deployment Method: ' + healthAsync.activatorType,
+                      healthAsync.activatorType === "Hardlinks", null,
+                      healthAsync.activatorType !== "Hardlinks"
+                        ? () => {
+                          api.events.emit("show-main-page", "game_settings");
+                          api.store.dispatch(actions.setSettingsPage("Mods"))
+                        }
+                        : null,
+                      healthAsync.activatorType !== "Hardlinks"
+                        ? "Open Game Settings"
+                        : null
+                    ),
+
+                    healthRow(isXsePrimary ? null : 'SKSE64 Not Default Launcher', isXsePrimary, false,
+                      !isXsePrimary
+                        ? () => api.events.emit("show-main-page", "tools_page")
+                        : null, "Jump to Tools tab"),
+
+                    healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
+                      fnisOrNemesisDetected
+                        ? scrollToSection('removefnis')
+                        : null,
+                      fnisOrNemesisDetected
+                        ? 'FNIS and Nemesis are not used. Click for details.'
+                        : null),
+
+                    !srsInstalled  // Skip the contentcatalog check if using SRS
+                      ? healthRow(
+                        !contentCatalogCheck ? null : 'Incompatible contentcatalog',
+                        !contentCatalogCheck, null,
+                        contentCatalogCheck
+                          ? scrollToSection('newcontentcatalog')
+                          : null,
+                        null)
+                      : null,
+
+                    healthRow(
                       healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
                         ? null
                         : healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
                           ? 'Optional Mods without DLC'
                           : healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
                             ? 'Missing Optional Mods'
-                            : null,
+                            : 'Review Optional Mods',
 
                       (healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13) ||
                       (healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0),
                       null,
-                      () => {
-                        const batched = [
-                          actions.setAttributeFilter('collection-mods', undefined, null),
-                          actions.setGroupingAttribute('collection-mods', null),
-                          actions.setAttributeFilter('collection-mods', 'required', false),
-                        ];
-                        util.batchDispatch(api.store.dispatch, batched);
-                        api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
-                      },
+                      (collectionCounts[baseCollectionName]?.optional ?? 0) == 13 || (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
+                        ? null
+                        : () => {
+                          const batched = [
+                            actions.setAttributeFilter('collection-mods', undefined, null),
+                            actions.setGroupingAttribute('collection-mods', null),
+                            actions.setAttributeFilter('collection-mods', 'required', false),
+                          ];
+                          util.batchDispatch(api.store.dispatch, batched);
+                          api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
+                        },
                       null,
-                    )
-                    : null,
+                    ),
 
-                  baseCollectionName
+
+
                     // ? healthRow((mainRevisionNumber == 100 && engineInjectorCount < 3) || (mainRevisionNumber == 99 && engineInjectorCount < 2)
-                    ? healthRow(engineInjectorsGood
+                    healthRow(engineInjectorsGood
                       ? null
                       : 'Engine Injector mod missing',
                       engineInjectorsGood,
@@ -2539,16 +2580,18 @@ const hasPreloader = engineInjectors.some(m =>
                         },
                       engineInjectors.forEach((injector, index) => { }
                         // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
-                      ),)
+                      ))
+                    ]
                     : null,
 
-                  healthStatsBad == 0
-                    ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" },
-                      reallyGoodRow("Health Stats look good!"))
-                    : null,
+                    healthStatsBad == 0
+                      ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '1' }, title: "No obvious problems found" },
+                        reallyGoodRow("Health Stats look good!"))
+                      : null,
 
-                ),),),
-        ),
+                  ),),),
+          )
+          : null,
 
         React.createElement('h3', null, 'Troubleshooting'),
         React.createElement('p', { style: { marginBottom: '12px', fontStyle: 'italic' } },
