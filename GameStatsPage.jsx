@@ -246,9 +246,9 @@ function moreInfo(infoItem, tooltip) {
     style: {
       cursor: 'pointer',
       // marginLeft: '-4px',
-      color: '#4fa3ff',
+      color: 'var(--brand-info)',
       fontWeight: 'bold',
-      border: '1px solid #4fa3ff',
+      border: '1px solid var(--brand-info)',
       borderRadius: '50%',
       width: '14px',
       height: '14px',
@@ -265,18 +265,18 @@ function statusIcon(isOk) {
     viewBox: '0 0 24 24',
     style: {
       width: '18px', height: '18px',
-      fill: isOk ? '#4caf50' : '#f44336',
+      fill: isOk ? 'var(--brand-success)' : 'var(--brand-danger)',
       flexShrink: 0, marginRight: '6px', verticalAlign: 'text'
     }
   }, React.createElement('path', { d: isOk ? MDI_CHECK_CIRCLE : null }));
 }
 
 function warningBell(tooltip) {
-  return React.createElement(Icon, { tooltip: tooltip, name: 'notifications', style: { fill: '#e5a50a' } });
+  return React.createElement(Icon, { tooltip: tooltip, name: 'notifications', style: { fill: 'var(--brand-warning)' } });
 }
 function locked(status, tooltip) {
   return React.createElement('span', { title: tooltip, style: { marginLeft: '-5px' } },
-    React.createElement(Icon, { name: status ? 'locked' : 'unlocked', style: { fill: status ? '#4fe50a' : '#db3e3e' } }));
+    React.createElement(Icon, { name: status ? 'locked' : 'unlocked', style: { fill: status ? 'var(--brand-success)' : 'var(--brand-danger)' } }));
 }
 
 function includeWarning(basetext, isOK, optionaltext) {
@@ -321,9 +321,9 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
   if (!isGood) {
     healthStatsBad++;;
     const icon = isGood
-      ? null //React.createElement('span', { style: { color: '#4caf50', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
+      ? null //React.createElement('span', { style: { color: 'var(--brand-success)', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
       : label
-        ? React.createElement('span', { style: { color: '#f44336', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start', fontSize: '14pt' } }, '✘')
+        ? React.createElement('span', { style: { color: 'var(--brand-danger)', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start', fontSize: '14pt' } }, '✘')
         : null;
 
 
@@ -354,7 +354,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
           viewBox: '0 0 24 24',
           style: {
             width: '15px', height: '15px',
-            fill: 'var(--color-primary-moderate)',
+            fill: 'var(--link-color)',
             cursor: 'pointer',
             flexShrink: 0, marginRight: '6px', verticalAlign: 'middle',
             marginBottom: '-6px'
@@ -368,7 +368,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
 
 
 function copyButton(text, tooltip) {
-  return React.createElement('span', { title: tooltip || 'Copy to clipboard', style: { color: 'var(--color-primary-moderate)', cursor: 'pointer', marginLeft: '6px' } },
+  return React.createElement('span', { title: tooltip || 'Copy to clipboard', style: { color: 'var(--link-color)', cursor: 'pointer', marginLeft: '6px' } },
     React.createElement('button', {
       className: 'btn-embed',
       style: { background: 'none', border: 'none', padding: 0 },
@@ -476,7 +476,7 @@ function scrollToSection(sectionId) {
       const originalOutlineOffset = el.style.outlineOffset;
 
       el.style.transition = 'outline-color 0.3s ease';
-      el.style.outline = '3px solid #ffb400';
+      el.style.outline = '3px solid var(--brand-highlight)';
       el.style.outlineOffset = '2px';
 
       setTimeout(() => {
@@ -515,7 +515,7 @@ function FaqItem({ heading, children, id }) {
       : null
   );
 }
-function buildFaqItems(api, gamePath, gameId) {
+function buildFaqItems(api, gamePath, gameId, mainCollectionAttributes) {
   return [
     {
       heading: 'Crash to desktop when clicking new game:',
@@ -602,7 +602,7 @@ function buildFaqItems(api, gamePath, gameId) {
         React.createElement('p', null,
           '    1. In Vortex goto Skyrim > Game Settings -> ',
           React.createElement('label', {
-            style: { cursor: 'pointer', textDecoration: 'underline', color: '#3daee9' },
+            style: { cursor: 'pointer', textDecoration: 'underline', color: 'var(--color-link)' },
             onClick: () => {
               api.events.emit("show-main-page", "game_settings");
 
@@ -635,6 +635,7 @@ function buildFaqItems(api, gamePath, gameId) {
       content:
         React.createElement('p', null,
           React.createElement('button', {
+            style: { cursor: 'pointer', border: '1px solid var(--border-color)' },
             className: 'btn btn-default',
             onClick: () => util.opn(gamePath.replace(/(\\common\\Skyrim\ Special\ Edition)/gm, '')).catch(() => undefined)
           }, 'Steam Folder'),
@@ -666,6 +667,7 @@ function buildFaqItems(api, gamePath, gameId) {
       content:
         React.createElement('p', null,
           React.createElement('button', {
+            style: { cursor: 'pointer', border: '1px solid var(--border-color)' },
             className: 'btn btn-default',
             onClick: () => util.opn(path.join(process.env.LOCALAPPDATA, 'Skyrim Special Edition')).catch(() => undefined)
           }, 'Open'),
@@ -698,6 +700,7 @@ function buildFaqItems(api, gamePath, gameId) {
             ' How To Fix',
             '<h1>A) IF YOU OWN AE DLC</h1>',),
           React.createElement('span', null, React.createElement('button', {
+            style: { cursor: 'pointer', border: '1px solid var(--border-color)' },
             className: 'btn btn-default',
             onClick: () => { setBFreebiesSeen(gameId, api) }
           }, 'Click to Download DLC on next start'), '   -OR-'),
@@ -714,6 +717,7 @@ function buildFaqItems(api, gamePath, gameId) {
             '',
             '<h1>B) IF YOU DON\'T OWN AE DLC</h1>',),
           React.createElement('button', {
+            style: { cursor: 'pointer', border: '1px solid var(--border-color)' },
             className: 'btn btn-default',
             onClick: () => {
               const batched = [
@@ -723,9 +727,9 @@ function buildFaqItems(api, gamePath, gameId) {
               ];
               util.batchDispatch(api.store.dispatch, batched);
               // api.events.emit("show-main-page", "Collections");
-              api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods")
+              api.events.emit("view-collection", `${mainCollectionAttributes.attributes.name}`, "mods")
             }
-          }, 'Open the I&A collections tab'),
+          }, 'View Optional Mods',), '  -OR-',
           ul(
             'You have installed the optional mods and they need to be disabled by following these steps:',
             '1) Go to the collections tab in Vortex',
@@ -1878,7 +1882,7 @@ function GameStatsPage({ api }) {
   // console.log('=====', JSON.stringify(Object.values(mods).filter((mod) => mod.type === "collection"), null, 2));
   const mainCollectionAttributes = installedCollections.find(m => {
     const modName = util.renderModName(m) || m.id;
-    return modName === 'Immersive & Adult' || modName === 'Immersive & Pure';
+    return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
 
   },);
   const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
@@ -1894,13 +1898,13 @@ function GameStatsPage({ api }) {
         : false
   );
 
-  const baseInstalledCollection = baseCollectionName + ' ' +baseRevisionNumber;
-  
+  const baseInstalledCollection = baseCollectionName + ' ' + baseRevisionNumber;
+
   const validBaseCollection = Object.entries(supportedRevisions).some(
     ([collection, revisions]) => `${collection} ${baseRevisionNumber}` === baseInstalledCollection // &&
     // revisions.includes(baseRevisionNumber)
   );
-console.log('====base, valid', baseInstalledCollection, validBaseCollection);
+  //console.log('====base, valid', baseInstalledCollection, validBaseCollection);
   const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
   const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
 
@@ -1942,7 +1946,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
     );
   }
 
-  const faqItems = buildFaqItems(api, gamePath, activeGameId);
+  const faqItems = buildFaqItems(api, gamePath, activeGameId, mainCollectionAttributes);
 
   //=========================== Render the page  ==========================================================
 
@@ -2003,10 +2007,10 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
     React.createElement(MainPage.Body, null,
       React.createElement('div', { style: { padding: '20px', overflowY: 'auto', height: '100%' } },
 
-        // Orange box wrapping everything EXCEPT the FAQ  
+        // Theme colored box wrapping everything EXCEPT the FAQ  
         React.createElement('div', {
           style: {
-            border: '2px solid orange',
+            border: 'var(--border-color) 2px solid',
             borderRadius: '6px',
             padding: '16px',
             marginBottom: '24px',
@@ -2058,24 +2062,49 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
               React.createElement('div', { style: { marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } },
                 React.createElement('strong', null, 'Active Game: '),
                 `${gameName} (${gameVersion}`,
-                skyrimVersionLocked !== null
+                skyrimVersionLocked !== null && gameVersion !== '1.7.104.0'
                   ? React.createElement('span', { style: { marginBottom: '5px', marginLeft: '0px', marginRight: '0px' } }, locked(skyrimVersionLocked, skyrimVersionLocked ? 'Skyrim version locked' : 'Skyrim version unlocked'))
                   : null,
                 React.createElement('span', { style: { marginBottom: '5px', marginLeft: '-3px' } }, moreInfo('lockversioninfo', 'Game version tips'), ' )'),
-                React.createElement('label', { style: { display: 'flex', alignItems: 'center' } },
+                React.createElement('label', {
+                  className: 'nxm-checkbox-field' + (healthAsync.aeDLCOwned === true ? ' nxm-checkbox-checked' : ''),
+                  style: { display: 'flex', alignItems: 'flex-end' },
+                },
                   React.createElement('input', {
                     type: 'checkbox',
+                    className: 'nxm-checkbox-input',
                     checked: healthAsync.aeDLCOwned === true,
                     onChange: (e) => {
                       const checked = e.target.checked;
                       setHealthAsync(p => ({ ...p, aeDLCOwned: checked ? true : false, aeDLCOwnedManual: true }));
                     },
-                    style: { marginRight: '6px', verticalAlign: 'middle' },
                   }),
+                  React.createElement('span', {
+                    className: 'nxm-checkbox',
+                    style: {
+                      marginRight: '6px',
+                      // constant box appearance — no swap based on checked state  
+                      backgroundColor: 'transparent',
+                      borderColor: 'var(--border-color)',
+                    },
+                  },
+                    healthAsync.aeDLCOwned === true
+                      ? React.createElement('svg', { viewBox: '0 0 24 24', width: '1em', height: '1em', style: { color: 'red' } },
+                        React.createElement('polyline', {
+                          points: '4,13 9,18 20,6',
+                          fill: 'none',
+                          stroke: 'var(--text-color)',
+                          strokeWidth: 3,
+                          strokeLinecap: 'round',
+                          strokeLinejoin: 'round',
+                        })
+                      )
+                      : null,
+                  ),
                   React.createElement('span', { style: { position: 'relative', top: '3px' } },
                     'AE DLC Owned ',
                     React.createElement('span', {
-                      style: { fontSize: '0.8em', color: '#888', marginLeft: '4px' },
+                      style: { fontSize: '0.8em', marginLeft: '4px' },
                     }, healthAsync.aeDLCOwnedManual ? '(manual)' : '(auto)')
                   )
                 )),
@@ -2215,7 +2244,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
                 }),
                 React.createElement('li', { key: '__none__' },
                   React.createElement('span', {
-                    style: { color: 'var(--color-primary-moderate)', cursor: 'pointer' },
+                    style: { color: 'var(--link-color)', cursor: 'pointer' },
                     title: 'View Mods',
                     onClick: () => {
                       const batched = [
@@ -2316,10 +2345,13 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
         ),
 
         // ── Health Checks ──────────────────────────────────────────────────────────  
-        React.createElement('label', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+        React.createElement('label', {
+          className: 'nxm-checkbox-field' + (healthAsync.enabled === true ? ' nxm-checkbox-checked' : ''),
+          style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+        },
           React.createElement('input', {
             type: 'checkbox',
-            default: 'checked',
+            className: 'nxm-checkbox-input',
             checked: healthAsync.enabled === true,
             onChange: (e) => {
               const checked = e.target.checked;
@@ -2327,16 +2359,36 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
             },
             style: { marginRight: '6px', verticalAlign: 'middle' },
           }),
+          React.createElement('span', {
+            className: 'nxm-checkbox',
+            style: {
+              marginRight: '6px',
+              backgroundColor: 'transparent',
+              borderColor: 'var(--border-color)',
+            },
+          },
+            healthAsync.enabled === true
+              ? React.createElement('svg', { viewBox: '0 0 24 24', width: '1em', height: '1em', style: { color: 'red' } },
+                React.createElement('polyline', {
+                  points: '4,13 9,18 20,6',
+                  fill: 'none',
+                  stroke: 'var(--text-color)',
+                  strokeWidth: 3,
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                })
+              )
+              : null,
+          ),
           React.createElement('span', { style: { position: 'relative', top: '3px' }, title: 'Enable or disable health checks for this game' },
             'Health Stats Enabled - Once your base collection is working and you start to alter it, you can disable these checks if wanted. Some are still useful though.',
-
           )
         ),
 
         healthAsync.enabled
           ? React.createElement('div', {
             style: {
-              border: '2px solid orange',
+              border: '2px solid var(--border-color)',
               borderRadius: '6px',
               padding: '12px',
               marginBottom: '16px',
@@ -2361,9 +2413,9 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
               },
                 React.createElement('h3', { style: { width: 'fit-content', marginTop: 0, marginBottom: '8px' } }, 'Health Stats'),
                 React.createElement('button', {
+                  style: { cursor: 'pointer', border: '1px solid var(--border-color)', marginBottom: 0, width: 'fit-content' },
                   onClick: () => setRefreshKey(k => k + 1),
                   className: 'btn btn-default btn-xs',
-                  style: { marginBottom: 0, width: 'fit-content' },
                 }, 'Refresh')
               ),
 
@@ -2376,7 +2428,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
                     marginLeft: '20px',
                     flex: 1,
                     minHeight: '120px',  // give the box enough height to actually center within  
-                    borderLeft: '2px solid orange',
+                    borderLeft: '2px solid var(--border-color)',
                     marginBottom: '-10px',
 
                   }
@@ -2395,7 +2447,7 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
                     display: 'flex',
                     justifyContent: 'center',
                     flex: 1,
-                    borderLeft: '2px solid orange',
+                    borderLeft: '2px solid var(--border-color)',
                     marginBottom: '-10px',
                   }
                 },
@@ -2469,120 +2521,122 @@ console.log('====base, valid', baseInstalledCollection, validBaseCollection);
                     validBaseCollection
                       ? [
                         healthRow(
-                        ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10))
-                          ? null
-                          : `Creations/DLC mismatch: ${nativeCount}/${nativeExpected}`,
-                        (healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10),
-                        null,
-                        null,
-                        'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
+                          ((healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10))
+                            ? null
+                            : `Creations/DLC mismatch: ${nativeCount}/${nativeExpected}`,
+                          (healthAsync.aeDLCOwned === true && nativeCount === 80) || (!healthAsync.aeDLCOwned && nativeCount === 10),
+                          null,
+                          null,
+                          'If the total count is incorrect, use the AE DLC checkbox to toggle ownership'),
 
-                    healthRow(gameLaunched ? null : 'INI Files Not Present', gameLaunched, false,
-                      !gameLaunched
-                        ? scrollToSection('notlaunchedthegame')
-                        : null,
-                      !gameLaunched
-                        ? 'You failed to launch the game before you modded it. Click for details.'
-                        : null),
+                        healthRow(gameLaunched ? null : 'INI Files Not Present', gameLaunched, false,
+                          !gameLaunched
+                            ? scrollToSection('notlaunchedthegame')
+                            : null,
+                          !gameLaunched
+                            ? 'You failed to launch the game before you modded it. Click for details.'
+                            : null),
 
-                    healthRow(nativeStatus, nativeStatus === null, null, scrollToSection('missingcc'), null),
+                        healthRow(nativeStatus, nativeStatus === null, null, scrollToSection('missingcc'), null),
 
-                    healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
-                      isRemovable
-                        ? scrollToSection('externaldrive')
-                        : null,
-                      isRemovable
-                        ? "Removable drives are not suppoted. Click for details"
-                        : null),
+                        healthRow(!isRemovable ? null : 'Removable drive found', !isRemovable, null,
+                          isRemovable
+                            ? scrollToSection('externaldrive')
+                            : null,
+                          isRemovable
+                            ? "Removable drives are not suppoted. Click for details"
+                            : null),
 
-                    healthRow(
-                      healthAsync.activatorType === "Hardlinks" ? null : 'Experimental Deployment Method: ' + healthAsync.activatorType,
-                      healthAsync.activatorType === "Hardlinks", null,
-                      healthAsync.activatorType !== "Hardlinks"
-                        ? () => {
-                          api.events.emit("show-main-page", "game_settings");
-                          api.store.dispatch(actions.setSettingsPage("Mods"))
-                        }
-                        : null,
-                      healthAsync.activatorType !== "Hardlinks"
-                        ? "Open Game Settings"
-                        : null
-                    ),
+                        healthRow(
+                          healthAsync.activatorType === "Hardlinks" ? null : 'Experimental Deployment Method: ' + healthAsync.activatorType,
+                          healthAsync.activatorType === "Hardlinks", null,
+                          healthAsync.activatorType !== "Hardlinks"
+                            ? () => {
+                              api.events.emit("show-main-page", "game_settings");
+                              api.store.dispatch(actions.setSettingsPage("Mods"))
+                            }
+                            : null,
+                          healthAsync.activatorType !== "Hardlinks"
+                            ? "Open Game Settings"
+                            : null
+                        ),
 
-                    healthRow(isXsePrimary ? null : 'SKSE64 Not Default Launcher', isXsePrimary, false,
-                      !isXsePrimary
-                        ? () => api.events.emit("show-main-page", "tools_page")
-                        : null, "Jump to Tools tab"),
+                        healthRow(isXsePrimary ? null : 'SKSE64 Not Default Launcher', isXsePrimary, false,
+                          !isXsePrimary
+                            ? () => api.events.emit("show-main-page", "tools_page")
+                            : null, "Jump to Tools tab"),
 
-                    healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
-                      fnisOrNemesisDetected
-                        ? scrollToSection('removefnis')
-                        : null,
-                      fnisOrNemesisDetected
-                        ? 'FNIS and Nemesis are not used. Click for details.'
-                        : null),
+                        healthRow(fnisOrNemesisDetected ? 'FNIS/Nemesis found' : null, !fnisOrNemesisDetected, false,
+                          fnisOrNemesisDetected
+                            ? scrollToSection('removefnis')
+                            : null,
+                          fnisOrNemesisDetected
+                            ? 'FNIS and Nemesis are not used. Click for details.'
+                            : null),
 
-                    !srsInstalled  // Skip the contentcatalog check if using SRS
-                      ? healthRow(
-                        !contentCatalogCheck ? null : 'Incompatible contentcatalog',
-                        !contentCatalogCheck, null,
-                        contentCatalogCheck
-                          ? scrollToSection('newcontentcatalog')
+                        !srsInstalled  // Skip the contentcatalog check if using SRS
+                          ? healthRow(
+                            !contentCatalogCheck ? null : 'Incompatible contentcatalog',
+                            !contentCatalogCheck, null,
+                            contentCatalogCheck
+                              ? scrollToSection('newcontentcatalog')
+                              : null,
+                            null)
                           : null,
-                        null)
+
+                        healthRow(
+                          healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
+                            ? null
+                            : healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
+                              ? 'Optional Mods without DLC'
+                              : healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
+                                ? 'Missing Optional Mods'
+                                : 'Review Optional Mods',
+
+                          (healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13) ||
+                          (healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0),
+                          null,
+                          (healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13) ||
+                            (healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0)
+                            ? null
+                            : scrollToSection('missingcc'),
+                          /* () => {
+                            const batched = [
+                              actions.setAttributeFilter('collection-mods', undefined, null),
+                              actions.setGroupingAttribute('collection-mods', null),
+                              actions.setAttributeFilter('collection-mods', 'required', false),
+                            ];
+                            util.batchDispatch(api.store.dispatch, batched);
+                            api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
+                          }, */
+                          null,
+                        ),
+
+
+
+                        // ? healthRow((mainRevisionNumber == 100 && engineInjectorCount < 3) || (mainRevisionNumber == 99 && engineInjectorCount < 2)
+                        healthRow(engineInjectorsGood
+                          ? null
+                          : 'Engine Injector mod missing',
+                          engineInjectorsGood,
+                          null,
+                          engineInjectorsGood
+                            ? null
+                            : () => {
+                              const batched = [
+                                actions.setAttributeFilter('mods', undefined, null),
+                                actions.setGroupingAttribute('mods', null),
+                                actions.setAttributeVisible('mods', 'modType', true),
+                                actions.setAttributeFilter('mods', 'modType', ["Engine Injector"]),
+                              ];
+                              util.batchDispatch(api.store.dispatch, batched);
+                              api.events.emit("show-main-page", "Mods");
+                            },
+                          engineInjectors.forEach((injector, index) => { }
+                            // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
+                          ))
+                      ]
                       : null,
-
-                    healthRow(
-                      healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
-                        ? null
-                        : healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13
-                          ? 'Optional Mods without DLC'
-                          : healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
-                            ? 'Missing Optional Mods'
-                            : 'Review Optional Mods',
-
-                      (healthAsync.aeDLCOwned == true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 13) ||
-                      (healthAsync.aeDLCOwned != true && (collectionCounts[baseCollectionName]?.optional ?? 0) == 0),
-                      null,
-                      (collectionCounts[baseCollectionName]?.optional ?? 0) == 13 || (collectionCounts[baseCollectionName]?.optional ?? 0) == 0
-                        ? null
-                        : () => {
-                          const batched = [
-                            actions.setAttributeFilter('collection-mods', undefined, null),
-                            actions.setGroupingAttribute('collection-mods', null),
-                            actions.setAttributeFilter('collection-mods', 'required', false),
-                          ];
-                          util.batchDispatch(api.store.dispatch, batched);
-                          api.events.emit("view-collection", 'Immersive--Adult-559748-99-1760260405', "mods");
-                        },
-                      null,
-                    ),
-
-
-
-                    // ? healthRow((mainRevisionNumber == 100 && engineInjectorCount < 3) || (mainRevisionNumber == 99 && engineInjectorCount < 2)
-                    healthRow(engineInjectorsGood
-                      ? null
-                      : 'Engine Injector mod missing',
-                      engineInjectorsGood,
-                      null,
-                      engineInjectorsGood
-                        ? null
-                        : () => {
-                          const batched = [
-                            actions.setAttributeFilter('mods', undefined, null),
-                            actions.setGroupingAttribute('mods', null),
-                            actions.setAttributeVisible('mods', 'modType', true),
-                            actions.setAttributeFilter('mods', 'modType', ["Engine Injector"]),
-                          ];
-                          util.batchDispatch(api.store.dispatch, batched);
-                          api.events.emit("show-main-page", "Mods");
-                        },
-                      engineInjectors.forEach((injector, index) => { }
-                        // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
-                      ))
-                    ]
-                    : null,
 
                     healthStatsBad == 0
                       ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '2' }, title: "No obvious problems found" },
