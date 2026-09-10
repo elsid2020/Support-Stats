@@ -36,7 +36,7 @@ const filesToSkip = new Set([
   'vortex.deployment.msgpack',
   'vortex.deployment.json.bak',
   'vortex.deployment.msgpack.bak',
-  'user.json.vortex_backup',
+  'vortex_backup',
   'user.json',
 ]);
 
@@ -45,6 +45,7 @@ const expectedPluginCountMap = {
   'Immersive & Adult100': [440, 92],
   'Immersive & Pure11': [396, 91],
   'Immersive & Pure12': [392, 93],
+  'Immersive & Epic': [0, 0],
 };
 
 const expectedModCountMap = {
@@ -52,11 +53,13 @@ const expectedModCountMap = {
   'Immersive & Adult100': [555, 13],
   'Immersive & Pure11': [477, 12],
   'Immersive & Pure12': [483, 13],
+  'Immersive & Epic': [0, 0],
 };
 
 const supportedRevisions = {
   'Immersive & Adult': ['99', '100'],
   'Immersive & Pure': ['11', '12'],
+  'Immersive & Epic': ['20'],
 };
 
 
@@ -148,6 +151,8 @@ const MDI_CHECK_CIRCLE = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S1
 const MDI_CLOSE_CIRCLE = 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z';
 const discordIconPath = "M19.4308 5.26368C18.1561 4.67878 16.7892 4.24785 15.3599 4.00104C15.3339 3.99627 15.3079 4.00818 15.2945 4.03198C15.1187 4.34466 14.9239 4.75258 14.7876 5.0732C13.2503 4.84306 11.721 4.84306 10.2153 5.0732C10.0789 4.74545 9.87707 4.34466 9.70048 4.03198C9.68707 4.00897 9.66107 3.99707 9.63504 4.00104C8.20659 4.24706 6.83963 4.67799 5.56411 5.26368C5.55307 5.26844 5.54361 5.27638 5.53732 5.28669C2.94449 9.16032 2.23421 12.9387 2.58265 16.6703C2.58423 16.6886 2.59447 16.706 2.60867 16.7171C4.31934 17.9734 5.97642 18.7361 7.60273 19.2416C7.62876 19.2496 7.65634 19.24 7.6729 19.2186C8.05761 18.6933 8.40054 18.1393 8.69456 17.5568C8.71192 17.5227 8.69535 17.4822 8.65989 17.4687C8.11594 17.2624 7.598 17.0108 7.09977 16.7251C7.06037 16.7021 7.05721 16.6457 7.09347 16.6187C7.19831 16.5402 7.30318 16.4584 7.4033 16.3759C7.42141 16.3608 7.44665 16.3576 7.46794 16.3671C10.7411 17.8615 14.2846 17.8615 17.5191 16.3671C17.5404 16.3568 17.5657 16.36 17.5846 16.3751C17.6847 16.4576 17.7895 16.5402 17.8952 16.6187C17.9314 16.6457 17.9291 16.7021 17.8897 16.7251C17.3914 17.0163 16.8735 17.2624 16.3288 17.4679C16.2933 17.4814 16.2775 17.5227 16.2949 17.5568C16.5952 18.1385 16.9381 18.6924 17.3157 19.2178C17.3315 19.24 17.3599 19.2496 17.3859 19.2416C19.0201 18.7361 20.6772 17.9734 22.3879 16.7171C22.4028 16.706 22.4123 16.6894 22.4139 16.6711C22.8309 12.357 21.7154 8.60956 19.4568 5.28748C19.4513 5.27638 19.4419 5.26844 19.4308 5.26368ZM9.18335 14.3982C8.19792 14.3982 7.38594 13.4935 7.38594 12.3824C7.38594 11.2713 8.18217 10.3666 9.18335 10.3666C10.1924 10.3666 10.9965 11.2793 10.9807 12.3824C10.9807 13.4935 10.1845 14.3982 9.18335 14.3982ZM15.829 14.3982C14.8435 14.3982 14.0316 13.4935 14.0316 12.3824C14.0316 11.2713 14.8278 10.3666 15.829 10.3666C16.838 10.3666 17.6421 11.2793 17.6264 12.3824C17.6264 13.4935 16.838 14.3982 15.829 14.3982Z";
 const SUCCESS_STRONG_CHECK = 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20M16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z'
+const MONITOR_SCREENSHOT = 'M9,6H5V10H7V8H9M19,10H17V12H15V14H19M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2';
+const FOLDER = 'M5,5H9L12,8H18C19.66,8 21,9.34 21,11V17C21,18.66 19.66,20 18,20H5C3.34,20 2,18.66 2,17V8C2,6.34 3.34,5 5,5M5,6C3.9,6 3,6.9 3,8V17C3,18.1 3.9,19 5,19H18C19.1,19 20,18.1 20,17V11C20,9.9 19.1,9 18,9H11.59L8.59,6H5Z';
 
 function getDriveInfo(drivePath) {
   try {
@@ -499,7 +504,8 @@ function FaqItem({ heading, children, id }) {
       style: {
         padding: '8px 12px',
         cursor: 'pointer',
-        background: '#3a3a3a',
+        // background: '#3a3a3a',
+        background: 'var(--brand-info)',
         fontWeight: 'bold',
         userSelect: 'none',
         display: 'flex',
@@ -892,7 +898,7 @@ function GameStatsPage({ api }) {
     : 'Unknown';
 
   const [healthAsync, setHealthAsync] = useState({
-    enabled: true,
+    statsEnabled: true,
     vcppVersion: null,
     vcppCurrent: null,
     updateAvailable: null,
@@ -1950,62 +1956,167 @@ function GameStatsPage({ api }) {
 
   //=========================== Render the page  ==========================================================
 
-  return React.createElement(MainPage, null,
-    React.createElement(MainPage.Header, null,
-      // Left button group
-      React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        React.createElement('button', {
-          className: 'btn btn-default',
-          onClick: () => util.opn(skyrimLogsPath).catch(() => undefined)
-        }, 'Skyrim Logs'),
-        React.createElement('button', {
-          className: 'btn btn-default',
-          onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
-        }, 'Vortex Logs'),
-        React.createElement('button', {
-          className: 'btn btn-default',
-          onClick: () => util.opn(gamePath).catch(() => undefined)
-        }, 'Game Folder'),
-      ),
-      // spacer — pushes everything after it to the right  
-      React.createElement('div', { className: 'flex-fill' }),
+ /* return React.createElement(MainPage, null,
+      React.createElement(MainPage.Header, null,
+        // Left button group
+        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => util.opn(skyrimLogsPath).catch(() => undefined)
+          }, 'Skyrim Logs'),
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
+          }, 'Vortex Logs'),
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: () => util.opn(gamePath).catch(() => undefined)
+          }, 'Game Folder'),
+        ),
+        // spacer — pushes everything after it to the right  
+        React.createElement('div', { className: 'flex-fill' }),
+  
+        //Right button group
+        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+          React.createElement('button', {
+            onClick: openScreenshotTool,
+            className: 'btn btn-default btn-s',
+            title: '⊞Win + Shift + S',
+          }, 'Take Screenshot'),
+          React.createElement('button', {
+            className: 'btn btn-default',
+            style: { display: 'flex', alignItems: 'center' },
+            onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
+          },
+            React.createElement('svg', {
+              viewBox: '0 0 24 24',
+              width: '16',
+              height: '16',
+              style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
+            },
+              React.createElement('path', { d: discordIconPath })
+            ),
+            'Immersive Discord'
+          ),
+          React.createElement('button', {
+            className: 'btn btn-default',
+            onClick: showWelcomeDialog
+          }, 'Tips'),
+          React.createElement('div', { style: { marginBottom: '-6px' } },
+            React.createElement('span', { title: 'Make Immersive Support the default tab' },
+              React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')
+            ),
+          ),
+        ),
+  
+      ), */
 
-      //Right button group
-      React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        React.createElement('button', {
-          onClick: openScreenshotTool,
-          className: 'btn btn-default btn-s',
-          title: '⊞Win + Shift + S',
-        }, 'Take Screenshot'),
-        React.createElement('button', {
-          className: 'btn btn-default',
-          style: { display: 'flex', alignItems: 'center' },
-          onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
+  return React.createElement(MainPage, null,
+    React.createElement(MainPage.Body, { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
+
+      React.createElement('div', {
+        style: {
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: '16px', padding: '16px', borderBottom: '1px solid var(--border-color)',
+          position: 'relative', // add this  
         },
-          React.createElement('svg', {
+      },
+        // Left: icon + title/subtitle block  
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, marginLeft: '16px' } },
+          // NOTE: no confirmed "pictogram"-style large icon exists in vortex-api's icon set for this;  
+          // using the generic Icon component as a placeholder. Swap 'name' below if a better match exists.  
+          React.createElement('img', {
+            src: path.join(__dirname, 'helmet1.png'),
+            style: {
+              height: '4em',
+              width: 'auto',
+              borderRadius: '50%',
+              objectFit: 'cover',
+              flexShrink: 0,
+              color: 'var(--brand-clickable)',
+            }
+          }),
+          React.createElement('div', { style: { minWidth: 0 } },
+            React.createElement('h2', {
+              style: { fontSize: '1.1rem', fontWeight: 600, margin: 0 },
+            }, 'Support Stats', React.createElement('span', {
+              style: { fontSize: '0.75rem', color: 'var(--text-color-disabled)', marginTop: '2px' },
+            }, ` v${extensionVersion}`),),
+
+            React.createElement('div', {
+              style: { fontSize: '0.85rem', color: 'var(--text-color-disabled)', marginTop: '2px' },
+            }, 'Tools and health checks for your Immersive collection'),
+          ),
+        ),
+        // Right: buttons + toggle  
+        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 } },
+          React.createElement('button', {
+            className: 'btn-embed',
+            title: 'Open the Skyrim logs folder for troubleshooting',
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'},
+            onClick: () => util.opn(skyrimLogsPath).catch(() => undefined),
+          },
+            React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' } , onClick: () => util.opn(skyrimLogsPath).catch(() => undefined) },),
+            'Skyrim Logs'
+          ),
+
+          React.createElement('button', {
+            className: 'btn-embed',
+            title: 'Open the Vortex logs folder for troubleshooting',
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+            onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
+          }, React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' } }),
+            'Vortex Logs'
+          ),
+
+          React.createElement('button', {
+            onClick: openScreenshotTool,
+            className: 'btn-embed',
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+            title: 'Screenshot ⊞Win + Shift + S',
+          }, React.createElement('svg', {
             viewBox: '0 0 24 24',
             width: '16',
             height: '16',
-            style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
+            style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 },
           },
-            React.createElement('path', { d: discordIconPath })
+            React.createElement('path', { d: MONITOR_SCREENSHOT })),
           ),
-          'Immersive Discord'
-        ),
-        React.createElement('button', {
-          className: 'btn btn-default',
-          onClick: showWelcomeDialog
-        }, 'Tips'),
-        React.createElement('div', { style: { marginBottom: '-6px' } },
-          React.createElement('span', { title: 'Make Immersive Support the default tab' },
-            React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')
+          React.createElement('button', {
+            className: 'btn-embed',
+            title: 'Open the Immersive Discord server for support',
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+            onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
+          },
+            React.createElement('svg', {
+              viewBox: '0 0 24 24',
+              width: '16',
+              height: '16',
+              style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 },
+            },
+              React.createElement('path', { d: discordIconPath })
+            ),
+          ),
+          React.createElement('button', {
+            className: 'btn-embed',
+            title: 'Useful tips for Immersive Collections',
+            style: { cursor: 'pointer', alignItems: 'center', justifyContent: 'center', display: 'flex' },
+            onClick: showWelcomeDialog,
+          }, React.createElement(Icon, { name: 'about', style: { width: '16px', height: '16px' } }
+
+          ),
+          ),
+          React.createElement('div', {
+            style: { position: 'absolute', top: '4px', right: '4px' },
+          },
+            React.createElement('span', { title: 'Make Immersive Support the default tab', style: { cursor: 'pointer' } },
+              React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')
+            ),
           ),
         ),
       ),
 
-    ),
-    React.createElement(MainPage.Body, null,
-      React.createElement('div', { style: { padding: '20px', overflowY: 'auto', height: '100%' } },
+      React.createElement('div', { style: { padding: '20px', overflowY: 'auto', flex: '1 1 auto', } },
 
         // Theme colored box wrapping everything EXCEPT the FAQ  
         React.createElement('div', {
@@ -2017,11 +2128,11 @@ function GameStatsPage({ api }) {
             position: 'relative',
           }
         },
-          React.createElement('h2', { style: { paddingRight: '220px' } }, `Support Stats `,
-            baseCollectionName == 'Immersive & Pure' || baseCollectionName == 'Immersive & Adult'
-              ? `- ${baseCollectionName} Rev.${baseRevisionNumber}`
+          React.createElement('h3', { style: { paddingRight: '220px' } },
+            validBaseCollection
+              ? `${baseInstalledCollection}`
               : null),
-          row('v' + extensionVersion),
+
           row('Vortex Version: ', vortexVersion),
           React.createElement('div', {
             style: {
@@ -2034,25 +2145,42 @@ function GameStatsPage({ api }) {
               lineHeight: '1.6',
             }
           },
-            React.createElement('div', null,
-              React.createElement('strong', null, ' OS: '),
-              hardwareInfo.os,
-            ),
-            React.createElement('div', null,
-              React.createElement('strong', null, 'CPU: '),
-              hardwareInfo.cpu
-            ),
-            React.createElement('div', null,
-              React.createElement('strong', null, 'RAM: '),
-              hardwareInfo.ram
-            ),
 
-            React.createElement('div', { style: { display: 'flex', whiteSpace: 'pre' } },
-              React.createElement('strong', null, 'GPU: '),
-              React.createElement('div', null,
-                formatGpuList(healthAsync.gpu ?? [])),
-            ),
-          ),
+           React.createElement('div', { className: 'flex-fill' }),
+
+            React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
+              React.createElement('div', {
+                style: {
+                  display: 'grid',
+                  // gridAutoFlow: 'column',
+                  gridTemplateRows: 'repeat(2, auto)',
+                  gridTemplateColumns: 'repeat(2, max-content)', // change 3 to however many columns you want
+                  columnGap: '10px',
+                  rowGap: '0px',
+
+                  // index < items.length - 1 ? { borderRight: '1px solid #ccc' } : null,
+                },
+              },
+                React.createElement('div', null,
+                  React.createElement('strong', null, ' OS: '),
+                  hardwareInfo.os,
+                ),
+                React.createElement('div', null,
+                  React.createElement('strong', null, 'CPU: '),
+                  hardwareInfo.cpu,
+                ),
+                React.createElement('div', null,
+                  React.createElement('strong', null, 'RAM: '),
+                  hardwareInfo.ram,
+                ),
+
+                React.createElement('div', { style: { display: 'flex', whiteSpace: 'pre' } },
+                  React.createElement('strong', null, 'GPU: '),
+                  React.createElement('div', null,
+                    formatGpuList(healthAsync.gpu ?? [])),
+                ),
+              ),
+            ),),
           React.createElement('hr', null),
 
           React.createElement('div', { style: { display: 'flex', gap: '24px', alignItems: 'flex-start' } },
@@ -2084,7 +2212,7 @@ function GameStatsPage({ api }) {
                     style: {
                       marginRight: '6px',
                       // constant box appearance — no swap based on checked state  
-                      backgroundColor: 'transparent',
+                      backgroundColor: healthAsync.aeDLCOwned === true ? 'var(--brand-info)' : 'transparent',
                       borderColor: 'var(--border-color)',
                     },
                   },
@@ -2346,16 +2474,16 @@ function GameStatsPage({ api }) {
 
         // ── Health Checks ──────────────────────────────────────────────────────────  
         React.createElement('label', {
-          className: 'nxm-checkbox-field' + (healthAsync.enabled === true ? ' nxm-checkbox-checked' : ''),
+          className: 'nxm-checkbox-field' + (healthAsync.statsEnabled === true ? ' nxm-checkbox-checked' : ''),
           style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
         },
           React.createElement('input', {
             type: 'checkbox',
             className: 'nxm-checkbox-input',
-            checked: healthAsync.enabled === true,
+            checked: healthAsync.statsEnabled === true,
             onChange: (e) => {
               const checked = e.target.checked;
-              setHealthAsync(p => ({ ...p, enabled: checked ? true : false }));
+              setHealthAsync(p => ({ ...p, statsEnabled: checked ? true : false }));
             },
             style: { marginRight: '6px', verticalAlign: 'middle' },
           }),
@@ -2363,11 +2491,11 @@ function GameStatsPage({ api }) {
             className: 'nxm-checkbox',
             style: {
               marginRight: '6px',
-              backgroundColor: 'transparent',
+              backgroundColor: healthAsync.statsEnabled === true ? 'var(--brand-info)' : 'transparent',
               borderColor: 'var(--border-color)',
             },
           },
-            healthAsync.enabled === true
+            healthAsync.statsEnabled === true
               ? React.createElement('svg', { viewBox: '0 0 24 24', width: '1em', height: '1em', style: { color: 'red' } },
                 React.createElement('polyline', {
                   points: '4,13 9,18 20,6',
@@ -2385,7 +2513,7 @@ function GameStatsPage({ api }) {
           )
         ),
 
-        healthAsync.enabled
+        healthAsync.statsEnabled
           ? React.createElement('div', {
             style: {
               border: '2px solid var(--border-color)',
