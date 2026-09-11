@@ -1,7 +1,8 @@
 const extensionVersion = "1.11.0";
 const React = require('react');
 const { useSelector, useDispatch } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter, Dropdown } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter, Dropdown, DropdownButton } = require('vortex-api');
+const { MenuItem } = require('react-bootstrap');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -153,6 +154,7 @@ const discordIconPath = "M19.4308 5.26368C18.1561 4.67878 16.7892 4.24785 15.359
 const SUCCESS_STRONG_CHECK = 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20M16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z'
 const MONITOR_SCREENSHOT = 'M9,6H5V10H7V8H9M19,10H17V12H15V14H19M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2';
 const FOLDER = 'M5,5H9L12,8H18C19.66,8 21,9.34 21,11V17C21,18.66 19.66,20 18,20H5C3.34,20 2,18.66 2,17V8C2,6.34 3.34,5 5,5M5,6C3.9,6 3,6.9 3,8V17C3,18.1 3.9,19 5,19H18C19.1,19 20,18.1 20,17V11C20,9.9 19.1,9 18,9H11.59L8.59,6H5Z';
+const FOLDER_OPEN_OUTLINE = 'M6.1,10L4,18V8H21A2,2 0 0,0 19,6H12L10,4H4A2,2 0 0,0 2,6V18A2,2 0 0,0 4,20H19C19.9,20 20.7,19.4 20.9,18.5L23.2,10H6.1M19,18H6L7.6,12H20.6L19,18Z';
 
 function getDriveInfo(drivePath) {
   try {
@@ -835,7 +837,7 @@ function GameStatsPage({ api }) {
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
   const [refreshKey, setRefreshKey] = React.useState(0);
-
+  const [open, setOpen] = React.useState(false);
 
   const gameInfo = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
@@ -1490,23 +1492,7 @@ function GameStatsPage({ api }) {
     checkIniFiles();
   }, [activeGameId, refreshKey]);
 
-  /*  useEffect(() => {
-      // --- INI files present ---  
-      const checkIniFiles = async () => {
-        const results = await Promise.all(
-          iniPaths.map(p =>
-            fs.statAsync(p)
-              .then((stats) => stats.size > 0)
-              .catch(() => false)
-          )
-        );
-        console.log('====INI file check results:', results);
-        const iniOk = iniPaths.length > 0 && results.every(r => r === true);
-        setHealthAsync((p) => ({ ...p, iniPresent: results }));
-      };
-  
-      checkIniFiles();
-    }, [activeGameId, refreshKey]); */
+    
 
   // Deployment  
 
@@ -1932,7 +1918,7 @@ function GameStatsPage({ api }) {
     const htmlContent = categories.length > 0
       ? categories.map(cat =>
         `<details><summary h4 style="font-weight:bold;cursor:pointer;margin:8px 0 4px">${cat.label} (${cat.files.length})</summary></h4>`
-       // + `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
+        // + `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
         + `<ul style="margin:0;padding-left:20px">`
         + cat.files.map(f => {
           const fullPath = `${f.directory}\\`;
@@ -2155,26 +2141,40 @@ function GameStatsPage({ api }) {
           ),
         ),
         // Right: buttons + toggle  
-        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 } },
-          React.createElement('button', {
-            className: 'btn-embed',
-            title: 'Open the Skyrim logs folder for troubleshooting',
-            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
-            onClick: () => util.opn(skyrimLogsPath).catch(() => undefined),
+        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, } },
+          React.createElement(Dropdown, {
+            id: 'open-folders-dropdown',
+            open: open,
+            title: 'Browse Folders',
+            onToggle: (isOpen) => setOpen(isOpen),
           },
-            React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' }, onClick: () => util.opn(skyrimLogsPath).catch(() => undefined) },),
-            'Skyrim Logs'
+            React.createElement(Dropdown.Toggle, {
+              noCaret: false,
+              className: 'btn-embed',
+              style: { display: 'flex', alignItems: 'center', gap: '4px' },
+            },
+              React.createElement('svg', {
+                viewBox: '0 0 24 24', width: '18', height: '20',
+                style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
+              },
+                React.createElement('path', { d: FOLDER_OPEN_OUTLINE })),
+            ),
+            React.createElement(Dropdown.Menu, null,
+              React.createElement(MenuItem, { eventKey: 'a', onClick: () => { util.opn(skyrimLogsPath).catch(() => undefined); setOpen(false); } }, 'Skyrim Logs'),
+              React.createElement(MenuItem, { eventKey: 'b', onClick: () => { util.opn(vortexLogsPath).catch(() => undefined); setOpen(false); } }, 'Vortex Logs'),
+              React.createElement(MenuItem, { eventKey: 'c', onClick: () => { util.opn(gamePath).catch(() => undefined); setOpen(false); } }, 'Game Folder'),
+            ),
           ),
 
-          React.createElement('button', {
-            className: 'btn-embed',
-            title: 'Open the Vortex logs folder for troubleshooting',
-            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
-            onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
-          }, React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' } }),
-            'Vortex Logs'
-          ),
-
+          /* React.createElement('button', {
+              className: 'btn-embed',
+              title: 'Open the Vortex logs folder for troubleshooting',
+              style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+              onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
+            }, React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' } }),
+              'Vortex Logs'
+            ),
+  */
           React.createElement('button', {
             onClick: openScreenshotTool,
             className: 'btn-embed',
@@ -2188,21 +2188,7 @@ function GameStatsPage({ api }) {
           },
             React.createElement('path', { d: MONITOR_SCREENSHOT })),
           ),
-          React.createElement('button', {
-            className: 'btn-embed',
-            title: 'Open the Immersive Discord server for support',
-            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
-            onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
-          },
-            React.createElement('svg', {
-              viewBox: '0 0 24 24',
-              width: '16',
-              height: '16',
-              style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 },
-            },
-              React.createElement('path', { d: discordIconPath })
-            ),
-          ),
+
           React.createElement('button', {
             className: 'btn-embed',
             title: 'Find which mod owns a specific file in the game data folder',
@@ -2243,10 +2229,28 @@ function GameStatsPage({ api }) {
             position: 'relative',
           }
         },
-          React.createElement('h3', { style: { paddingRight: '220px' } },
-            validBaseCollection
-              ? `${baseInstalledCollection}`
-              : null),
+          React.createElement('div', { style: { display: 'flex' } },
+
+            React.createElement('h3', { style: { paddingRight: '10px' } },
+              validBaseCollection
+                ? `${baseInstalledCollection}`
+                : null),
+            React.createElement('button', {
+              className: 'btn-embed',
+              title: 'Open the Immersive Discord server for support',
+              style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+              onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
+            },
+              React.createElement('svg', {
+                viewBox: '0 0 24 24',
+                width: '16',
+                height: '16',
+                style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 },
+              },
+                React.createElement('path', { d: discordIconPath })
+              ),
+            ),
+          ),
 
           row('Vortex Version: ', vortexVersion),
           React.createElement('div', {
