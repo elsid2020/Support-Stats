@@ -1926,11 +1926,18 @@ function GameStatsPage({ api }) {
       { label: 'Animations', files: unmanagedFiles.animations },
     ].filter(cat => cat.files.length > 0);
 
+    const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const escapeJs = (s) => s.replace(/\\\\/g, '\\').replace(/'/g, "\\'");
+
     const htmlContent = categories.length > 0
       ? categories.map(cat =>
         `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
         + `<ul style="margin:0;padding-left:20px">`
-        + cat.files.map(f => `<li>${f.parentDir}\\${f.name}</li>`).join('')
+        + cat.files.map(f => {
+          const fullPath = `${gamePath}\\${f.parentDir}\\`;
+          const filePath = path.join(fullPath, f.name);
+          return `<li><a href="#" class="unmanaged-file-link" data-path="${escapeJs(fullPath)}">${escapeHtml(filePath)}</a></li>`;
+        }).join('')
         + `</ul>`
       ).join('')
       : '<p>No unmanaged files detected.</p>';
@@ -1943,73 +1950,167 @@ function GameStatsPage({ api }) {
           + '#game-stats-unmanaged { display: flex !important; align-items: center; }'
           + '#game-stats-unmanaged .modal-dialog { margin: auto !important; height: auto !important; }'
           + '#game-stats-unmanaged .dialog-container { min-height: 0 !important; }'
-          + '#game-stats-unmanaged .dialog-content-html { flex: 0 0 auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
+          + '#game-stats-unmanaged .dialog-content-html { flex: 0 0 auto !important; font-size: 14px !important; line-height: 1.4em !important; max-height: 60vh !important; overflow-y: auto !important; }'
           + '</style>'
           + htmlContent
       },
       [{ label: 'Close' }],
-      'game-stats-unmanaged'
-    );
+      'game-stats-unmanaged',
+
+
+      setTimeout(() => {
+        const container = document.querySelector('#game-stats-unmanaged .dialog-content-html');
+        if (container) {
+          container.addEventListener('click', (e) => {
+            const target = e.target.closest('[data-path]');
+            if (target) {
+              util.opn(target.getAttribute('data-path'));
+            }
+          });
+        }
+      }, 100)
+    )
   }
 
   const faqItems = buildFaqItems(api, gamePath, activeGameId, mainCollectionAttributes);
 
+  const [searchPath, setSearchPath] = useState('');
+  const [manifestFiles, setManifestFiles] = useState([]);
+  const [result, setResult] = useState(null);
+
+  // Load the manifest once (or on refresh), not per-keystroke  
+  useEffect(() => {
+    util.getManifest(api).then(manifest => setManifestFiles(manifest.files));
+  }, []);
+
+  const onSearch = (value) => {
+    setSearchPath(value);
+    const normalized = value.trim().replace(/\//g, '\\').toLowerCase();
+    const match = manifestFiles.find(f => f.relPath.toLowerCase() === normalized);
+    setResult(match ? match.source : null);
+  };
+
+  function showFindWinningModDialog() {
+    api.showDialog(
+      'question',
+      'Find Winning Mod',
+      {
+        text: 'Enter a file path (relative to the game data folder) to find which mod currently owns it.',
+        input: [
+          {
+            id: 'filePath',
+            type: 'text',
+            label: 'File path',
+            placeholder: 'e.g. meshes\\foo.nif',
+          },
+        ],
+      },
+      [{ label: 'Cancel' }, { label: 'Search', default: true }],
+    ).then((result) => {
+      if (result.action !== 'Search') {
+        return;
+      }
+      const query = (result.input.filePath || '').trim();
+      if (query.length === 0) {
+        return;
+      }
+
+      util.getManifest(api)
+        .then((manifest) => {
+          const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');
+          const matches = manifest.files.filter(
+            normalizedQuery.includes('\\')
+              ? (f) => f.relPath.toLowerCase().endsWith(normalizedQuery)
+              : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),
+          );
+
+          const sortedMatches = matches.sort((a, b) => {
+            const bySource = a.source.toLowerCase().localeCompare(b.source.toLowerCase());
+            if (bySource !== 0) return bySource;
+            return a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase());
+          });
+          const resultText = sortedMatches.length > 0
+            ? sortedMatches.map(m => `${m.relPath} -> ${m.source}`).join('\n')
+            : `No deployed file matching "${query}" was found in the manifest.`
+
+          api.showDialog(
+            'info',
+            'Search Result',
+            {
+              htmlText: '<style>'
+                + '#find-winning-mod-result { display: flex !important; align-items: center; }'
+                + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'
+                + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'
+                + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
+                + '</style>',
+              text: resultText,
+            },
+            [{ label: 'Close' }],
+            'find-winning-mod-result',
+          );
+        })
+        .catch((err) => {
+          api.showErrorNotification('Failed to read deployment manifest', err);
+        });
+    });
+  };
+
   //=========================== Render the page  ==========================================================
 
- /* return React.createElement(MainPage, null,
-      React.createElement(MainPage.Header, null,
-        // Left button group
-        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-          React.createElement('button', {
-            className: 'btn btn-default',
-            onClick: () => util.opn(skyrimLogsPath).catch(() => undefined)
-          }, 'Skyrim Logs'),
-          React.createElement('button', {
-            className: 'btn btn-default',
-            onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
-          }, 'Vortex Logs'),
-          React.createElement('button', {
-            className: 'btn btn-default',
-            onClick: () => util.opn(gamePath).catch(() => undefined)
-          }, 'Game Folder'),
-        ),
-        // spacer — pushes everything after it to the right  
-        React.createElement('div', { className: 'flex-fill' }),
-  
-        //Right button group
-        React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-          React.createElement('button', {
-            onClick: openScreenshotTool,
-            className: 'btn btn-default btn-s',
-            title: '⊞Win + Shift + S',
-          }, 'Take Screenshot'),
-          React.createElement('button', {
-            className: 'btn btn-default',
-            style: { display: 'flex', alignItems: 'center' },
-            onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
-          },
-            React.createElement('svg', {
-              viewBox: '0 0 24 24',
-              width: '16',
-              height: '16',
-              style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
-            },
-              React.createElement('path', { d: discordIconPath })
-            ),
-            'Immersive Discord'
-          ),
-          React.createElement('button', {
-            className: 'btn btn-default',
-            onClick: showWelcomeDialog
-          }, 'Tips'),
-          React.createElement('div', { style: { marginBottom: '-6px' } },
-            React.createElement('span', { title: 'Make Immersive Support the default tab' },
-              React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')
-            ),
-          ),
-        ),
-  
-      ), */
+  /* return React.createElement(MainPage, null,
+       React.createElement(MainPage.Header, null,
+         // Left button group
+         React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+           React.createElement('button', {
+             className: 'btn btn-default',
+             onClick: () => util.opn(skyrimLogsPath).catch(() => undefined)
+           }, 'Skyrim Logs'),
+           React.createElement('button', {
+             className: 'btn btn-default',
+             onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
+           }, 'Vortex Logs'),
+           React.createElement('button', {
+             className: 'btn btn-default',
+             onClick: () => util.opn(gamePath).catch(() => undefined)
+           }, 'Game Folder'),
+         ),
+         // spacer — pushes everything after it to the right  
+         React.createElement('div', { className: 'flex-fill' }),
+   
+         //Right button group
+         React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+           React.createElement('button', {
+             onClick: openScreenshotTool,
+             className: 'btn btn-default btn-s',
+             title: '⊞Win + Shift + S',
+           }, 'Take Screenshot'),
+           React.createElement('button', {
+             className: 'btn btn-default',
+             style: { display: 'flex', alignItems: 'center' },
+             onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
+           },
+             React.createElement('svg', {
+               viewBox: '0 0 24 24',
+               width: '16',
+               height: '16',
+               style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
+             },
+               React.createElement('path', { d: discordIconPath })
+             ),
+             'Immersive Discord'
+           ),
+           React.createElement('button', {
+             className: 'btn btn-default',
+             onClick: showWelcomeDialog
+           }, 'Tips'),
+           React.createElement('div', { style: { marginBottom: '-6px' } },
+             React.createElement('span', { title: 'Make Immersive Support the default tab' },
+               React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')
+             ),
+           ),
+         ),
+   
+       ), */
 
   return React.createElement(MainPage, null,
     React.createElement(MainPage.Body, { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
@@ -2053,10 +2154,10 @@ function GameStatsPage({ api }) {
           React.createElement('button', {
             className: 'btn-embed',
             title: 'Open the Skyrim logs folder for troubleshooting',
-            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'},
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
             onClick: () => util.opn(skyrimLogsPath).catch(() => undefined),
           },
-            React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' } , onClick: () => util.opn(skyrimLogsPath).catch(() => undefined) },),
+            React.createElement(Icon, { name: 'browse', style: { width: '16px', height: '16px', marginRight: '4px' }, onClick: () => util.opn(skyrimLogsPath).catch(() => undefined) },),
             'Skyrim Logs'
           ),
 
@@ -2096,6 +2197,15 @@ function GameStatsPage({ api }) {
             },
               React.createElement('path', { d: discordIconPath })
             ),
+          ),
+          React.createElement('button', {
+            className: 'btn-embed',
+            title: 'Find which mod owns a specific file in the game data folder',
+            style: { cursor: 'pointer', alignItems: 'center', justifyContent: 'center', display: 'flex' },
+            onClick: showFindWinningModDialog,
+          }, React.createElement(Icon, { name: 'search', style: { width: '16px', height: '16px' } }
+
+          ),
           ),
           React.createElement('button', {
             className: 'btn-embed',
@@ -2146,7 +2256,7 @@ function GameStatsPage({ api }) {
             }
           },
 
-           React.createElement('div', { className: 'flex-fill' }),
+            React.createElement('div', { className: 'flex-fill' }),
 
             React.createElement('div', { style: { flexShrink: 0, textAlign: 'left', minWidth: '220px' } },
               React.createElement('div', {
@@ -2188,11 +2298,12 @@ function GameStatsPage({ api }) {
             // Column 1: Path/folder data
             React.createElement('div', { style: { flex: '1' } },
               React.createElement('div', { style: { marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } },
-                React.createElement('strong', null, 'Active Game: '),
+                React.createElement('strong', null, 'Active Game: ',),
                 `${gameName} (${gameVersion}`,
                 skyrimVersionLocked !== null && gameVersion !== '1.7.104.0'
                   ? React.createElement('span', { style: { marginBottom: '5px', marginLeft: '0px', marginRight: '0px' } }, locked(skyrimVersionLocked, skyrimVersionLocked ? 'Skyrim version locked' : 'Skyrim version unlocked'))
                   : null,
+
                 React.createElement('span', { style: { marginBottom: '5px', marginLeft: '-3px' } }, moreInfo('lockversioninfo', 'Game version tips'), ' )'),
                 React.createElement('label', {
                   className: 'nxm-checkbox-field' + (healthAsync.aeDLCOwned === true ? ' nxm-checkbox-checked' : ''),
