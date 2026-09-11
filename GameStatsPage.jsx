@@ -1,7 +1,7 @@
 const extensionVersion = "1.11.0";
 const React = require('react');
 const { useSelector, useDispatch } = require('react-redux');
-const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter } = require('vortex-api');
+const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter, Dropdown } = require('vortex-api');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
 const path = require('path');
 const os = require('os');
@@ -1599,7 +1599,7 @@ function GameStatsPage({ api }) {
               .then(stats => {
                 if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
                 return stats.nlink <= 1
-                  ? [{ name: entry, parentDir: path.basename(dirPath) }]
+                  ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
                   : [];
               })
               .catch(() => []);
@@ -1926,19 +1926,21 @@ function GameStatsPage({ api }) {
       { label: 'Animations', files: unmanagedFiles.animations },
     ].filter(cat => cat.files.length > 0);
 
-    const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const escapeJs = (s) => s.replace(/\\\\/g, '\\').replace(/'/g, "\\'");
+    const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const escapeJs = (s) => s.replace(/\\\\/g, '\\').replace(/'/g, "\'");
 
     const htmlContent = categories.length > 0
       ? categories.map(cat =>
-        `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
+        `<details><summary h4 style="font-weight:bold;cursor:pointer;margin:8px 0 4px">${cat.label} (${cat.files.length})</summary></h4>`
+       // + `<h4 style="margin:8px 0 4px">${cat.label} (${cat.files.length})</h4>`
         + `<ul style="margin:0;padding-left:20px">`
         + cat.files.map(f => {
-          const fullPath = `${gamePath}\\${f.parentDir}\\`;
+          const fullPath = `${f.directory}\\`;
           const filePath = path.join(fullPath, f.name);
-          return `<li><a href="#" class="unmanaged-file-link" data-path="${escapeJs(fullPath)}">${escapeHtml(filePath)}</a></li>`;
+          return `<li><a href="#" class="unmanaged-file-link" data-path="${escapeHtml(fullPath)}">${escapeHtml(filePath)}</a></li>`;
         }).join('')
         + `</ul>`
+        + `</details>`
       ).join('')
       : '<p>No unmanaged files detected.</p>';
 
@@ -1947,19 +1949,22 @@ function GameStatsPage({ api }) {
       `Unmanaged Files in ${gamePath}\\Data`,
       {
         htmlText: '<style>'
-          + '#game-stats-unmanaged { display: flex !important; align-items: center; }'
-          + '#game-stats-unmanaged .modal-dialog { margin: auto !important; height: auto !important; }'
-          + '#game-stats-unmanaged .dialog-container { min-height: 0 !important; }'
-          + '#game-stats-unmanaged .dialog-content-html { flex: 0 0 auto !important; font-size: 14px !important; line-height: 1.4em !important; max-height: 60vh !important; overflow-y: auto !important; }'
+          + '#unmanaged-files-dialog { display: flex !important; align-items: center; }'
+          + '#unmanaged-files-dialog .modal-dialog { margin: auto !important; height: auto !important; }'
+          + '#unmanaged-files-dialog .dialog-container { min-height: 0 !important; }'
+          + '#unmanaged-files-dialog .dialog-content-html { flex: 0 0 auto !important; font-size: 14px !important; line-height: 1.4em !important; max-height: 60vh !important; overflow-y: auto !important; }'
+          + '#unmanaged-files-dialog summary::before { content: "▶"; display: inline-block; width: 1em; margin-right: 0.5em; }'
+          + '#unmanaged-files-dialog details[open] summary::before { content: "▼"; }'
+          + '#unmanaged-files-dialog details summary { cursor: pointer; }'
           + '</style>'
           + htmlContent
       },
       [{ label: 'Close' }],
-      'game-stats-unmanaged',
+      'unmanaged-files-dialog',
 
 
       setTimeout(() => {
-        const container = document.querySelector('#game-stats-unmanaged .dialog-content-html');
+        const container = document.querySelector('#unmanaged-files-dialog .dialog-content-html');
         if (container) {
           container.addEventListener('click', (e) => {
             const target = e.target.closest('[data-path]');
