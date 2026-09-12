@@ -1,4 +1,4 @@
-const extensionVersion = "1.11.0";
+const extensionVersion = "1.12.0";
 const React = require('react');
 const { useSelector, useDispatch } = require('react-redux');
 const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter, Dropdown, DropdownButton } = require('vortex-api');
