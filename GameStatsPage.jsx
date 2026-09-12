@@ -155,6 +155,7 @@ const SUCCESS_STRONG_CHECK = 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 
 const MONITOR_SCREENSHOT = 'M9,6H5V10H7V8H9M19,10H17V12H15V14H19M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2';
 const FOLDER = 'M5,5H9L12,8H18C19.66,8 21,9.34 21,11V17C21,18.66 19.66,20 18,20H5C3.34,20 2,18.66 2,17V8C2,6.34 3.34,5 5,5M5,6C3.9,6 3,6.9 3,8V17C3,18.1 3.9,19 5,19H18C19.1,19 20,18.1 20,17V11C20,9.9 19.1,9 18,9H11.59L8.59,6H5Z';
 const FOLDER_OPEN_OUTLINE = 'M6.1,10L4,18V8H21A2,2 0 0,0 19,6H12L10,4H4A2,2 0 0,0 2,6V18A2,2 0 0,0 4,20H19C19.9,20 20.7,19.4 20.9,18.5L23.2,10H6.1M19,18H6L7.6,12H20.6L19,18Z';
+const FOLDER_ALERT_OUTLINE = 'M15,12H17V17H15V12M15,18H17V20H15V18M16,9C17.07,9 18.09,9.24 19,9.67V8H3V18H9.29C9.1,17.36 9,16.69 9,16A7,7 0 0,1 16,9M23,16A7,7 0 0,1 16,23C13.62,23 11.5,21.81 10.25,20H3C1.89,20 1,19.1 1,18V6C1,4.89 1.89,4 3,4H9L11,6H19A2,2 0 0,1 21,8V11.1C22.24,12.36 23,14.09 23,16M16,11A5,5 0 0,0 11,16A5,5 0 0,0 16,21A5,5 0 0,0 21,16A5,5 0 0,0 16,11Z';
 
 function getDriveInfo(drivePath) {
   try {
@@ -838,6 +839,7 @@ function GameStatsPage({ api }) {
   const displayIniPaths = rawIniPaths.map(displayPath);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [open, setOpen] = React.useState(false);
+  const [acknowledged, setAcknowledged] = React.useState(false); 
 
   const gameInfo = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
@@ -910,6 +912,8 @@ function GameStatsPage({ api }) {
     aeDLCOwned: null,   // null=checking, true=owned, 'unknown'=no Steam data 
     aeDLCOwnedManual: false,   // true=checked manually
     activatorType: deploymentMethodLabel,
+    crashLogPresent: null,
+    newestCrashLog: null,
   });
 
   const pluginList = useSelector(state =>
@@ -1492,9 +1496,48 @@ function GameStatsPage({ api }) {
     checkIniFiles();
   }, [activeGameId, refreshKey]);
 
-    
+  useEffect(() => {
+    // --- New Crashlog present ---  
 
-  // Deployment  
+    const newCrashlog = async () => {
+      console.log('====new crash log check start');
+      try {
+        const files = await fs.readdirAsync(skyrimLogsPath);
+        const now = new Date();
+        const todayLocalISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 10);
+
+
+        const crashRe = /^crash-(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})-(\d{2})\.log$/i;
+
+        const todaysCrashes = files
+          .map((name) => {
+            const m = name.match(crashRe);
+            if (m === null || m[1] !== todayLocalISO) {
+              return undefined;
+            }
+            return { name, time: `${m[1]}T${m[2]}:${m[3]}:${m[4]}` };
+          })
+          .filter((entry) => entry !== undefined)
+          .sort((a, b) => b.time.localeCompare(a.time));
+
+        const newestCrashLog = todaysCrashes.length > 0
+          ? path.join(skyrimLogsPath, todaysCrashes[0].name)
+          : undefined;
+
+
+        setHealthAsync((p) => ({ ...p, crashLogPresent: newestCrashLog !== undefined, newestCrashLog }));
+        console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCrashLog )
+      } catch (err) {
+
+        setHealthAsync((p) => ({ ...p, crashLogPresent: false, newestCrashLog: undefined }));
+      }
+    };
+console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCrashLog )
+    newCrashlog();
+  }, [activeGameId, refreshKey]); 
+
 
 
   const pluginsSorted = useSelector((state) =>
@@ -2145,22 +2188,26 @@ function GameStatsPage({ api }) {
           React.createElement(Dropdown, {
             id: 'open-folders-dropdown',
             open: open,
-            title: 'Browse Folders',
-            onToggle: (isOpen) => setOpen(isOpen),
+            onToggle: (isOpen) => { 
+              setOpen(isOpen);
+              if (isOpen) setAcknowledged(true);
           },
+        },
             React.createElement(Dropdown.Toggle, {
               noCaret: false,
               className: 'btn-embed',
+              title: healthAsync.crashLogPresent ? healthAsync.newestCrashLog : 'Browse Folders',
               style: { display: 'flex', alignItems: 'center', gap: '4px' },
             },
               React.createElement('svg', {
                 viewBox: '0 0 24 24', width: '18', height: '20',
-                style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
+                style: { marginRight: '4px', fill: healthAsync.crashLogPresent && acknowledged == false ? 'red' : 'currentColor', flexShrink: 0 }
               },
-                React.createElement('path', { d: FOLDER_OPEN_OUTLINE })),
+                React.createElement('path', { d: healthAsync.crashLogPresent && acknowledged == false ? FOLDER_ALERT_OUTLINE : FOLDER_OPEN_OUTLINE })),
             ),
             React.createElement(Dropdown.Menu, null,
-              React.createElement(MenuItem, { eventKey: 'a', onClick: () => { util.opn(skyrimLogsPath).catch(() => undefined); setOpen(false); } }, 'Skyrim Logs'),
+              React.createElement(MenuItem, { eventKey: 'a', onClick: () => { util.opn(skyrimLogsPath).catch(() => undefined); setOpen(false) } }, 'Skyrim Logs',
+                React.createElement(Icon, { name: 'attention-required', style: { width: '16px', height: '16px', marginLeft: '10px' } }),),
               React.createElement(MenuItem, { eventKey: 'b', onClick: () => { util.opn(vortexLogsPath).catch(() => undefined); setOpen(false); } }, 'Vortex Logs'),
               React.createElement(MenuItem, { eventKey: 'c', onClick: () => { util.opn(gamePath).catch(() => undefined); setOpen(false); } }, 'Game Folder'),
             ),
