@@ -2205,13 +2205,15 @@ console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCras
             },
               React.createElement('svg', {
                 viewBox: '0 0 24 24', width: '18', height: '20',
-                style: { marginRight: '4px', fill: healthAsync.crashLogPresent && acknowledged == false ? 'red' : 'currentColor', flexShrink: 0 }
+                style: { marginRight: '4px', fill: (healthAsync.crashLogPresent && acknowledged == false) ? 'red' : 'currentColor', flexShrink: 0 }
               },
-                React.createElement('path', { d: healthAsync.crashLogPresent && acknowledged == false ? FOLDER_ALERT_OUTLINE : FOLDER_OPEN_OUTLINE })),
+                React.createElement('path', { d: (healthAsync.crashLogPresent && acknowledged == false) ? FOLDER_ALERT_OUTLINE : FOLDER_OPEN_OUTLINE })),
             ),
             React.createElement(Dropdown.Menu, null,
               React.createElement(MenuItem, { eventKey: 'a', onClick: () => { util.opn(skyrimLogsPath).catch(() => undefined); setOpen(false) } }, 'Skyrim Logs',
-                React.createElement(Icon, { name: 'attention-required', style: { width: '16px', height: '16px', marginLeft: '10px' } }),),
+              healthAsync.crashLogPresent
+                ? React.createElement(Icon, { name: 'attention-required', style: { width: '16px', height: '16px', marginLeft: '10px' } })
+                : null),
               React.createElement(MenuItem, { eventKey: 'b', onClick: () => { util.opn(vortexLogsPath).catch(() => undefined); setOpen(false); } }, 'Vortex Logs'),
               React.createElement(MenuItem, { eventKey: 'c', onClick: () => { util.opn(gamePath).catch(() => undefined); setOpen(false); } }, 'Game Folder'),
             ),
