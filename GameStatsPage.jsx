@@ -31,15 +31,19 @@ const iniFileMap = {
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
-const filesToSkip = new Set([
-  '__folder_managed_by_vortex',
-  'vortex.deployment.json',
-  'vortex.deployment.msgpack',
-  'vortex.deployment.json.bak',
-  'vortex.deployment.msgpack.bak',
-  'vortex_backup',
-  'user.json',
-]);
+const exactSkip = new Set([  
+  '__folder_managed_by_vortex',  
+  'vortex.deployment.json',  
+  'vortex.deployment.msgpack',  
+  'vortex.deployment.json.bak',  
+  'vortex.deployment.msgpack.bak',  
+  'user.json',  
+]);  
+const suffixSkip = ['.vortex_backup'];  
+  
+function shouldSkip(entry) {  
+  return exactSkip.has(entry) || suffixSkip.some((suf) => entry.endsWith(suf));  
+}
 
 const expectedPluginCountMap = {
   'Immersive & Adult99': [440, 92],
@@ -1622,7 +1626,7 @@ console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCras
       return fs.readdirAsync(dirPath)
         .then(entries => Promise.all(
           entries.map(entry => {
-            if (filesToSkip.has(entry)) return Promise.resolve([]);
+            if (shouldSkip.has(entry)) return Promise.resolve([]);
             const fullPath = path.join(dirPath, entry);
             return fs.statAsync(fullPath)
               .then(stats => {
