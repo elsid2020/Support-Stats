@@ -918,6 +918,7 @@ function GameStatsPage({ api }) {
     activatorType: deploymentMethodLabel,
     crashLogPresent: null,
     newestCrashLog: null,
+    securityEvents: null,
   });
 
   const pluginList = useSelector(state =>
@@ -1504,7 +1505,6 @@ function GameStatsPage({ api }) {
     // --- New Crashlog present ---  
 
     const newCrashlog = async () => {
-      console.log('====new crash log check start');
       try {
         const files = await fs.readdirAsync(skyrimLogsPath);
         const now = new Date();
@@ -1532,13 +1532,11 @@ function GameStatsPage({ api }) {
 
 
         setHealthAsync((p) => ({ ...p, crashLogPresent: newestCrashLog !== undefined, newestCrashLog }));
-        console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCrashLog )
       } catch (err) {
 
         setHealthAsync((p) => ({ ...p, crashLogPresent: false, newestCrashLog: undefined }));
       }
     };
-console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCrashLog )
     newCrashlog();
   }, [activeGameId, refreshKey]); 
 
@@ -2092,6 +2090,69 @@ console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCras
         });
     });
   };
+
+  useEffect(() => {
+    async function getSkyrimCodeIntegrityEvents() {
+
+      try {
+        const ps = `
+      $start = (Get-Date).AddHours(-.25)   
+$sac_events = ''
+$def_events = ''
+
+$sac_events = Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
+    LogName   = 'Microsoft-Windows-CodeIntegrity/Operational'
+    Id        = 3077
+    StartTime = $start
+} | Where-Object {
+    $_.Message -match 'Skyrim Special Edition|Vortex'
+} | Select-Object TimeCreated, Id, ProviderName, Message
+
+if ($sac_events) {'SmartApp Control Events Found'} else {''}
+
+
+$def_events = Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
+    LogName = 'Microsoft-Windows-Windows Defender/Operational'
+    Id = 1117,1123
+    StartTime = $start
+} | Where-Object {
+        $_.Message -match 'Skyrim Special Edition|Vortex'
+    } | Select-Object TimeCreated, Message 
+
+if ($def_events) {'Defender Events Found'} else {''}
+
+`;
+
+        const { promisify } = require('util');
+        const { execFile } = require('child_process');
+        const execFileAsync = promisify(execFile);
+        const { stdout, stderr } = await execFileAsync(
+          'powershell.exe',
+          ['-NoProfile', '-Command', ps],
+          { encoding: 'utf8' }
+        );
+
+      
+
+  
+  
+        const result = stdout.trim();
+  
+        setHealthAsync((p) => ({ ...p, securityEvents: result ? result : null, }));
+
+      } catch (error) {
+        // console.log('====ERROR', error);
+        // console.log('====ERROR STDOUT', error.stdout);
+        // console.log('====ERROR STDERR', error.stderr);
+         
+        setHealthAsync((p) => ({ ...p, securityEvents: '' }));
+      }
+    };
+    getSkyrimCodeIntegrityEvents();
+  }, [activeGameId, refreshKey]);
+
+  console.log('====', healthAsync.securityEvents);
+
 
   //=========================== Render the page  ==========================================================
 
@@ -2935,7 +2996,9 @@ console.log('====setHealth', healthAsync.crashLogPresent, healthAsync.newestCras
                             },
                           engineInjectors.forEach((injector, index) => { }
                             // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
-                          ))
+                          )),
+                        healthRow(healthAsync.securityEvents ? 'Windows Security Events' : null, healthAsync.securityEvents == '', false,
+                          null, healthAsync.securityEvents),
                       ]
                       : null,
 
