@@ -328,10 +328,13 @@ function reallyGoodRow(label) {
 
 let healthStatsBad = 13;
 
+const badList = [];
 
 function healthRow(label, isGood, detail, onClick, tooltip) {
   if (!isGood) {
-    healthStatsBad++;;
+    healthStatsBad++;
+    badList.push(label);
+    // console.log('====whatsbad',label, `${healthStatsBad}`);
     const icon = isGood
       ? null //React.createElement('span', { style: { color: 'var(--brand-success)', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
       : label
@@ -1934,7 +1937,7 @@ function GameStatsPage({ api }) {
         ? hasSwapper && hasPreloader
         : false
   );
-
+console.log('====', engineInjectorCount, engineInjectorsGood)
   const baseInstalledCollection = baseCollectionName + ' ' + baseRevisionNumber;
 
   const validBaseCollection = Object.entries(supportedRevisions).some(
@@ -2138,14 +2141,14 @@ if ($def_events) {'Defender Events Found'} else {''}
   
         const result = stdout.trim();
   
-        setHealthAsync((p) => ({ ...p, securityEvents: result ? result : null, }));
+        setHealthAsync((p) => ({ ...p, securityEvents: result ? result : false, }));
 
       } catch (error) {
         // console.log('====ERROR', error);
         // console.log('====ERROR STDOUT', error.stdout);
         // console.log('====ERROR STDERR', error.stderr);
          
-        setHealthAsync((p) => ({ ...p, securityEvents: '' }));
+        setHealthAsync((p) => ({ ...p, securityEvents: "error" }));
       }
     };
     getSkyrimCodeIntegrityEvents();
@@ -2153,7 +2156,7 @@ if ($def_events) {'Defender Events Found'} else {''}
 
   console.log('====', healthAsync.securityEvents);
 
-
+console.log('====badlist',badList)
   //=========================== Render the page  ==========================================================
 
   /* return React.createElement(MainPage, null,
@@ -2977,7 +2980,7 @@ if ($def_events) {'Defender Events Found'} else {''}
 
 
                         // ? healthRow((mainRevisionNumber == 100 && engineInjectorCount < 3) || (mainRevisionNumber == 99 && engineInjectorCount < 2)
-                        healthRow(engineInjectorsGood
+                       healthRow(engineInjectorsGood
                           ? null
                           : 'Engine Injector mod missing',
                           engineInjectorsGood,
@@ -2997,12 +3000,12 @@ if ($def_events) {'Defender Events Found'} else {''}
                           engineInjectors.forEach((injector, index) => { }
                             // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
                           )),
-                        healthRow(healthAsync.securityEvents ? 'Windows Security Events' : null, healthAsync.securityEvents == '', false,
-                          null, healthAsync.securityEvents),
+                        healthRow(healthAsync.securityEvents ? 'Windows Security Events' : null, !healthAsync.securityEvents , false,
+                        null, healthAsync.securityEvents), 
                       ]
                       : null,
-
-                    healthStatsBad == 0
+                    console.log('====badstats', `${healthStatsBad}`),
+                    healthStatsBad == 0                    
                       ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '2' }, title: "No obvious problems found" },
                         reallyGoodRow("Health Stats look good!"))
                       : null,
