@@ -333,8 +333,7 @@ const badList = [];
 function healthRow(label, isGood, detail, onClick, tooltip) {
   if (!isGood) {
     healthStatsBad++;
-    badList.push(label);
-    // console.log('====whatsbad',label, `${healthStatsBad}`);
+
     const icon = isGood
       ? null //React.createElement('span', { style: { color: 'var(--brand-success)', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
       : label
@@ -878,7 +877,7 @@ function GameStatsPage({ api }) {
   const pendingRef = React.useRef(0);
   const [settled, setSettled] = React.useState(false);
 
-  const steamPath = getSteamPath();
+  const steamPath = React.useMemo(() => getSteamPath(), []);
 
 
   function beginCheck() {
@@ -1086,13 +1085,14 @@ function GameStatsPage({ api }) {
 
   const nativeExpected = healthAsync.aeDLCOwned === true ? 80 : 10;
 
+  const modValues = Object.values(mods);
 
-
-  const totalModsInstalled = Object.values(mods).filter(
+/*
+  const totalModsInstalled = modValues.filter(
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
-
-  const srsInstalled = Object.values(mods).find(
+*/
+  const srsInstalled = modValues.find(
     m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper')
 
   );
@@ -1197,9 +1197,9 @@ function GameStatsPage({ api }) {
     async function fetchManifest() {
       try {
         const result = await util.getManifest(api, undefined, activeGameId);
-        if (!cancelled) { endCheck(); setManifest(result); }
+        if (!cancelled) { endCheck(); setManifest(result); };
       } catch (err) {
-        if (!cancelled) { endCheck(); setManifest(null); }
+        if (!cancelled) { endCheck(); setManifest(null); };
       }
     }
 
@@ -1365,10 +1365,10 @@ function GameStatsPage({ api }) {
     const profile = selectors.activeProfile(state);
     if (!gameId || !profile) return false;
 
-    const mods = state.persistent.mods[gameId] || {};
+    // const mods = state.persistent.mods[gameId] || {};
     const modState = profile.modState || {};
 
-    return Object.values(mods).some((mod) => {
+    return modValues.some((mod) => {
       if (mod.type !== 'collection') return false;
       const name = (mod.attributes?.customFileName ?? mod.attributes?.name ?? '').toLowerCase();
       return name.includes('immersive') && name.includes('adult')
@@ -1558,7 +1558,7 @@ function GameStatsPage({ api }) {
   // Vortex update pending (non-beta)  
   const updatePending = healthAsync.updateAvailable === true;
 
-  const skseMod = Object.values(mods).find((m) => m.attributes?.scriptExtender === true && m.state === 'installed' && profile?.modState?.[m.id]?.enabled === true);
+  const skseMod = modValues.find((m) => m.attributes?.scriptExtender === true && m.state === 'installed' && profile?.modState?.[m.id]?.enabled === true);
   const skseVersion = skseMod?.attributes?.version;
 
   // SKSE64 as primary tool  
@@ -1748,7 +1748,7 @@ function GameStatsPage({ api }) {
   // Build a map of modId -> [{ coll, type }, ...]  
   const collectionMap = React.useMemo(() => {
     const map = {};
-    Object.values(mods).filter(m => m.type === 'collection').forEach(coll => {
+    modValues.filter(m => m.type === 'collection').forEach(coll => {
       (coll.rules || []).forEach(rule => {
         const refId = rule.reference?.id;
         const entry = { coll, type: rule.type }; // 'requires' | 'recommends'  
@@ -1774,12 +1774,11 @@ function GameStatsPage({ api }) {
 
   );
   const enabledModsCount = enabledModIds.length;
-  const regularMods = Object.values(mods).filter(m => m.type !== 'collection');
+  const regularMods = modValues.filter(m => m.type !== 'collection');
   const disabledCount = regularMods.filter(m =>
     m.state === 'installed' && profile?.modState?.[m.id]?.enabled !== true
   ).length;
 
-  // console.log('====', enabledModIds.join('\n'));
 
   const collectionCounts = {}; // name -> { total, required, optional }  
   let noneCount = 0;
@@ -1895,12 +1894,11 @@ function GameStatsPage({ api }) {
 
   const gameProfileCount = gameProfiles.length;
 
-  const engineInjectors = Object.values(mods).filter(
+  const engineInjectors = modValues.filter(
     (mod) => mod.type === 'dinput' && mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true,
 
   );
   const engineInjectorCount = engineInjectors.length;
-  // console.log('====EnabledIEs', engineInjectors);
 
   const hasSwapper = engineInjectors.some(m =>
     (util.renderModName(m) || m.id).toLowerCase().includes('runtime swapper')
@@ -1910,16 +1908,12 @@ function GameStatsPage({ api }) {
     (util.renderModName(m) || m.id).toLowerCase().includes('engine fixes - skse64 preloader')
   );
 
-
-  // console.log('====GoodEIs', hasSwapper, hasPreloader);
-  // console.log('=====Good', JSON.stringify(engineInjectorsGood, null, 2));
-  //console.log('=====', JSON.stringify(engineInjectors, null, 2));
-  const installedCollections = Object.values(mods).filter(
+  const installedCollections = modValues.filter(
     (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
 
   );
   const collectionCount = installedCollections.length;
-  // console.log('=====', JSON.stringify(Object.values(mods).filter((mod) => mod.type === "collection"), null, 2));
+
   const mainCollectionAttributes = installedCollections.find(m => {
     const modName = util.renderModName(m) || m.id;
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
@@ -1937,14 +1931,12 @@ function GameStatsPage({ api }) {
         ? hasSwapper && hasPreloader
         : false
   );
-console.log('====', engineInjectorCount, engineInjectorsGood)
   const baseInstalledCollection = baseCollectionName + ' ' + baseRevisionNumber;
 
   const validBaseCollection = Object.entries(supportedRevisions).some(
     ([collection, revisions]) => `${collection} ${baseRevisionNumber}` === baseInstalledCollection // &&
     // revisions.includes(baseRevisionNumber)
   );
-  //console.log('====base, valid', baseInstalledCollection, validBaseCollection);
   const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
   const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
 
@@ -2011,8 +2003,8 @@ console.log('====', engineInjectorCount, engineInjectorsGood)
     )
   }
 
-  const faqItems = buildFaqItems(api, gamePath, activeGameId, mainCollectionAttributes);
-
+  const faqItems = React.useMemo(() => buildFaqItems(api, gamePath, activeGameId, mainCollectionAttributes), [api,gamePath,activeGameId,mainCollectionAttributes]);
+/*
   const [searchPath, setSearchPath] = useState('');
   const [manifestFiles, setManifestFiles] = useState([]);
   const [result, setResult] = useState(null);
@@ -2093,9 +2085,60 @@ console.log('====', engineInjectorCount, engineInjectorsGood)
         });
     });
   };
+*/
+
+function showFindWinningModDialog() {  
+  api.showDialog(  
+    'question',  
+    'Find Winning Mod',  
+    {  
+      input: [{ id: 'filePath', type: 'text', label: 'File path or filename' }],  
+    },  
+    [{ label: 'Cancel' }, { label: 'Search', default: true }],  
+  ).then((result) => {  
+    if (result.action !== 'Search') {  
+      return;  
+    }  
+    const query = (result.input.filePath || '').trim();  
+    if (!query) {  
+      return;  
+    }  
+  
+    const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');  
+    const matches = manifest?.files?.filter(  
+      normalizedQuery.includes('\\')  
+        ? (f) => f.relPath.toLowerCase() === normalizedQuery  
+        : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),  
+    );  
+  
+    const sortedMatches = matches  
+      .slice()  
+      .sort((a, b) => a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase()));  
+  
+    const resultText = sortedMatches.length > 0  
+      ? sortedMatches.map((m) => `${m.relPath} -> ${m.source}`).join('\n')  
+      : 'No matching file found in the deployment manifest.';  
+  
+    api.showDialog(  
+      'info',  
+      'Search Result',  
+      {  
+        htmlText: '<style>'  
+          + '#find-winning-mod-result { display: flex !important; align-items: center; }'  
+          + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'  
+          + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'  
+          + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'  
+          + '</style>',  
+        text: resultText,  
+      },  
+      [{ label: 'Close' }],  
+      'find-winning-mod-result',  
+    );  
+  });  
+}
 
   useEffect(() => {
-    async function getSkyrimCodeIntegrityEvents() {
+    async function getSkyrimSecurityEvents() {
 
       try {
         const ps = `
@@ -2144,19 +2187,14 @@ if ($def_events) {'Defender Events Found'} else {''}
         setHealthAsync((p) => ({ ...p, securityEvents: result ? result : false, }));
 
       } catch (error) {
-        // console.log('====ERROR', error);
-        // console.log('====ERROR STDOUT', error.stdout);
-        // console.log('====ERROR STDERR', error.stderr);
-         
+                
         setHealthAsync((p) => ({ ...p, securityEvents: "error" }));
       }
     };
-    getSkyrimCodeIntegrityEvents();
+    getSkyrimSecurityEvents();
   }, [activeGameId, refreshKey]);
 
-  console.log('====', healthAsync.securityEvents);
-
-console.log('====badlist',badList)
+  
   //=========================== Render the page  ==========================================================
 
   /* return React.createElement(MainPage, null,
@@ -2303,7 +2341,8 @@ console.log('====badlist',badList)
             height: '16',
             style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 },
           },
-            React.createElement('path', { d: MONITOR_SCREENSHOT })),
+            React.createElement('path', { d: MONITOR_SCREENSHOT })
+          ),
           ),
 
           React.createElement('button', {
@@ -2998,13 +3037,11 @@ console.log('====badlist',badList)
                               api.events.emit("show-main-page", "Mods");
                             },
                           engineInjectors.forEach((injector, index) => { }
-                            // console.log(`===== ${index} KEYS:`, Object.keys(injector.attributes))}
                           )),
                         healthRow(healthAsync.securityEvents ? 'Windows Security Events' : null, !healthAsync.securityEvents , false,
                         null, healthAsync.securityEvents), 
                       ]
                       : null,
-                    console.log('====badstats', `${healthStatsBad}`),
                     healthStatsBad == 0                    
                       ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '2' }, title: "No obvious problems found" },
                         reallyGoodRow("Health Stats look good!"))
