@@ -328,12 +328,13 @@ function reallyGoodRow(label) {
 
 let healthStatsBad = 13;
 
-const badList = [];
+// const badList = [];
 
 function healthRow(label, isGood, detail, onClick, tooltip) {
   if (!isGood) {
     healthStatsBad++;
-
+    // const listThemBaddies = badList.push(label);
+    
     const icon = isGood
       ? null //React.createElement('span', { style: { color: 'var(--brand-success)', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
       : label
@@ -1227,7 +1228,7 @@ function GameStatsPage({ api }) {
     state.settings?.gameMode?.discovered?.[activeGameId]?.tools ?? {}
   );
 
-  const toolList = Object.values(discoveredTools)
+/*  const toolList = Object.values(discoveredTools)
     .filter(tool => tool.path != null && tool.hidden !== true)
     .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
 
@@ -1236,9 +1237,9 @@ function GameStatsPage({ api }) {
 
   const visibleTools = toolsExpanded ? toolList : toolList.slice(0, MAX_VISIBLE_TOOLS);
 
-  // const spaceUsed = gameInfo?.size?.value;
-  // const spaceNoLinks = gameInfo?.size_nolinks?.value;
-
+  const spaceUsed = gameInfo?.size?.value;
+  const spaceNoLinks = gameInfo?.size_nolinks?.value;
+*/
   const [spaceUsed, setSpaceUsed] = React.useState(null);
   const [spaceNoLinks, setSpaceNoLinks] = React.useState(null);
 
@@ -1767,7 +1768,7 @@ function GameStatsPage({ api }) {
 
     });
     return map;
-  }, [mods, refreshKey]);
+  }, [mods]);
 
   const enabledModIds = Object.keys(profile?.modState || {}).filter(
     (modId) => profile.modState[modId]?.enabled === true,
@@ -1815,7 +1816,7 @@ function GameStatsPage({ api }) {
   // A plugin is disabled if it exists on disk, is not native, and is not active  
   const disabledPlugins = React.useMemo(() => Object.keys(pluginList).filter(
     (id) => !pluginList[id]?.isNative && !isActive(id)
-  ), [pluginList, loadOrder, refreshKey]);
+  ), [pluginList, loadOrder]);
 
   const isValid = (id) =>
     (pluginList[id]?.deployed === true || pluginList[id]?.isNative === true) && isActive(id);
@@ -1850,10 +1851,10 @@ function GameStatsPage({ api }) {
   }, [gamePath, activeGameId, pluginList, refreshKey]);
 
 
-  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder, refreshKey]);
-  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders, refreshKey]);
-  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders, refreshKey]);
-  const missingMasters = React.useMemo(() => {
+  const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder]);
+  const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders]);
+  const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders]);
+ // const missingMasters = React.useMemo(() => {
     const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));
     const result = {};
     activePlugins.forEach(id => {
@@ -1862,7 +1863,7 @@ function GameStatsPage({ api }) {
       if (missing.length > 0) result[id] = missing;
     });
     return result;
-  }, [activePlugins, pluginHeaders, refreshKey]);
+  }, [activePlugins, pluginHeaders]);
 
   const regularLimit = eslGame ? 254 : 255;
   const lightLimit = 4096;
@@ -1870,6 +1871,7 @@ function GameStatsPage({ api }) {
   const profileName = profile?.name || 'None';
 
   const { shallowEqual } = require('react-redux');
+const { BADFAMILY } = require('dns');
 
   // Get profiles for the current game  
   const gameProfiles = useSelector((state) => {
@@ -2109,7 +2111,7 @@ function showFindWinningModDialog() {
       normalizedQuery.includes('\\')  
         ? (f) => f.relPath.toLowerCase() === normalizedQuery  
         : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),  
-    );  
+    ) ?? [];  
   
     const sortedMatches = matches  
       .slice()  
@@ -2395,7 +2397,7 @@ if ($def_events) {'Defender Events Found'} else {''}
               className: 'btn-embed',
               title: 'Open the Immersive Discord server for support',
               style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
-              onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
+              onClick: () => util.opn(discordURL).catch(() => undefined)
             },
               React.createElement('svg', {
                 viewBox: '0 0 24 24',
