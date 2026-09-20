@@ -1676,7 +1676,10 @@ if (cancelled || shouldSkip(entry)) return Promise.resolve([]);
         );  
       })  
       .then(results => [].concat(...results))  
-      .catch(() => []);  
+      .catch((err) => {  
+  log('warn', 'walkUnmanaged failed', { dirPath, error: err?.message });  
+  return [];  
+});  
   }  
   
   const scanPlugins = walkUnmanaged(dataPath, 1)  
