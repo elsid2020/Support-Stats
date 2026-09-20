@@ -1,6 +1,6 @@
 const extensionVersion = "1.12.2";
 const React = require('react');
-const { useSelector, useDispatch } = require('react-redux');
+const { useSelector, useDispatch, shallowEqual } = require('react-redux');
 const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter, Dropdown, DropdownButton } = require('vortex-api');
 const { MenuItem } = require('react-bootstrap');
 const nodeFs = require('fs');               // native Node fs — use only for statfsSync
@@ -928,6 +928,11 @@ function GameStatsPage({ api }) {
     (state.session?.plugins?.pluginList) ?? {}
   );
 
+  const isDeployActive = useSelector((state) => {
+    const modsActivity = util.getSafe(state, ['session', 'base', 'activity', 'mods'], []);
+    return modsActivity.includes('deployment') || modsActivity.includes('purging');
+  });
+
   const fnisAutoRunCheck = useSelector((state) => util.getSafe(state, ['settings', 'fnis', 'autoRun'], false));
 
   const nativeCount = Object.values(pluginList).filter(p => p.isNative).length;
@@ -1093,10 +1098,9 @@ function GameStatsPage({ api }) {
     m => m.type !== 'collection' && m.state === 'installed'
   ).length;
 */
-  const srsInstalled = modValues.find(
+  const srsInstalled = React.useMemo(() => modValues.find(
     m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper')
-
-  );
+  ), [modValues]);
 
   const [hardwareInfo, setHardwareInfo] = React.useState({
     cpu: 'Loading...',
@@ -1156,8 +1160,10 @@ function GameStatsPage({ api }) {
           resolve(match ? `${match[1]} (via Wine)` : 'Linux (via Wine)');
         });
       } else if (process.platform === 'win32') {
+        const command = 
+  'powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; (Get-WmiObject Win32_OperatingSystem).Caption"';
         exec(
-          'powershell -NoProfile -Command "(Get-WmiObject Win32_OperatingSystem).Caption"',
+          command, { encoding: 'utf8' },
           (err, stdout) => {
             if (err || !stdout.trim()) {
               resolve(`Windows (${require('os').release()})`);
@@ -1182,9 +1188,19 @@ function GameStatsPage({ api }) {
   const suppressedNotifications = useSelector((state) =>
     state.settings.notifications.suppress ?? {}
   );
-  const activeNotifications = useSelector((state) =>
-    state.session.notifications.notifications || []
-  );
+  const suppressedIds = React.useMemo(() => Object.keys(suppressedNotifications)
+    .filter(id => suppressedNotifications[id] === true), [suppressedNotifications]);
+  const activeNotificationDetails = useSelector((state) => {
+    const notifications = state.session.notifications.notifications || [];
+    const details = {};
+    suppressedIds.forEach((id) => {
+      const notification = notifications.find(item => item.id === id);
+      details[id] = notification
+        ? `${notification.message}\u0000${notification.type}`
+        : '';
+    });
+    return details;
+  }, shallowEqual);
   const needToDeploy = useSelector((state) =>
     state.persistent?.deployment?.needToDeploy?.[activeGameId] === true
   );
@@ -1559,7 +1575,7 @@ function GameStatsPage({ api }) {
   // Vortex update pending (non-beta)  
   const updatePending = healthAsync.updateAvailable === true;
 
-  const skseMod = modValues.find((m) => m.attributes?.scriptExtender === true && m.state === 'installed' && profile?.modState?.[m.id]?.enabled === true);
+  const skseMod = React.useMemo(() => modValues.find((m) => m.attributes?.scriptExtender === true && m.state === 'installed' && profile?.modState?.[m.id]?.enabled === true), [modValues, profile]);
   const skseVersion = skseMod?.attributes?.version;
 
   // SKSE64 as primary tool  
@@ -1620,77 +1636,104 @@ function GameStatsPage({ api }) {
 
   const dataPath = path.join(gamePath, 'Data');
 
-  useEffect(() => {
-    if (!gamePath || gamePath === 'Not discovered') return;
-    setRawUnmanaged(prev => ({ ...prev, loading: true }));
-    function walkUnmanaged(dirPath, maxDepth) {
-      if (maxDepth <= 0) return Promise.resolve([]);
-      return fs.readdirAsync(dirPath)
-        .then(entries => Promise.all(
-          entries.map(entry => {
-            if (shouldSkip.has(entry)) return Promise.resolve([]);
-            const fullPath = path.join(dirPath, entry);
-            return fs.statAsync(fullPath)
-              .then(stats => {
-                if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
-                return stats.nlink <= 1
-                  ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
-                  : [];
-              })
-              .catch(() => []);
-          })
-        ))
-        .then(results => [].concat(...results))
-        .catch(() => []);
-    }
+ useEffect(() => {  
+  log('info', 'Start unmanaged file walk')
+  if (!gamePath || gamePath === 'Not discovered') return;  
+  
+  // Don't even start the scan if deployment is already running.  
+  if (isDeployActive) {  
+    setRawUnmanaged(prev => ({ ...prev, loading: false }));  
+    return;  
+  }  
+  
+  let cancelled = false;  
+  
+  setRawUnmanaged(prev => ({ ...prev, loading: true }));  
+  
+  // Limit concurrent fs.statAsync calls so the scan doesn't compete  
+  // heavily with deployment's own disk I/O.  
+  const limiter = new util.ConcurrencyLimiter(200);  
+  
+  function walkUnmanaged(dirPath, maxDepth) {  
+    if (cancelled || maxDepth <= 0) return Promise.resolve([]);  
+    return fs.readdirAsync(dirPath)  
+      .then(entries => {  
+        if (cancelled) return [];  
+        return Promise.all(  
+          entries.map(entry => {  
+            if (cancelled || shouldSkip.has(entry)) return Promise.resolve([]);  
+            const fullPath = path.join(dirPath, entry);  
+            return limiter  
+              .do(() => fs.statAsync(fullPath))  
+              .then(stats => {  
+                if (cancelled) return [];  
+                if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);  
+                return stats.nlink <= 1  
+                  ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]  
+                  : [];  
+              })  
+              .catch(() => []);  
+          })  
+        );  
+      })  
+      .then(results => [].concat(...results))  
+      .catch(() => []);  
+  }  
+  
+  const scanPlugins = walkUnmanaged(dataPath, 1)  
+    .then(files => files.filter(f =>  
+      ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))  
+    );  
+  
+  const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>  
+    files.filter(f => path.extname(f.name).toLowerCase() === '.dll')  
+  );  
+  
+  const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 10).then(files =>  
+    files.filter(f => ['.dds', '.png'].includes(path.extname(f.name).toLowerCase()))  
+  );  
+  
+  const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 10)  
+    .then(files => {  
+      const meshes = [];  
+      const animations = [];  
+      files.forEach(f => {  
+        const ext = path.extname(f.name).toLowerCase();  
+        if (ext === '.hkx' || ext === '.hkb' || f.parentDir.toLowerCase() === 'animations') {  
+          animations.push(f);  
+        } else {  
+          meshes.push(f);  
+        }  
+      });  
+      return { meshes, animations };  
+    })  
+    .catch(() => ({ meshes: [], animations: [] }));  
+  
+  const scanStarted = performance.now();
 
-    const scanPlugins = walkUnmanaged(dataPath, 1)
-      .then(files => files.filter(f =>
-        ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))
-      );
+Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
+  .then(([plugins, dlls, textures, meshesAndAnims]) => {
+    if (cancelled) return;
 
-
-    const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>
-      files.filter(f => path.extname(f.name).toLowerCase() === '.dll')
-    );
-
-    const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 10).then(files =>
-      files.filter(f => ['.dds', '.png'].includes(path.extname(f.name).toLowerCase()))
-    );
-
-    const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 10)
-      .then(files => {
-        const meshes = [];
-        const animations = [];
-        files.forEach(f => {
-          const ext = path.extname(f.name).toLowerCase();
-          if (ext === '.hkx' || ext === '.hkb' || f.parentDir.toLowerCase() === 'animations') {
-            animations.push(f);
-          } else {
-            meshes.push(f);
-          }
-        });
-        return { meshes, animations };
-      })
-      .catch(() => ({ meshes: [], animations: [] }));
-
-    Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
-      .then(([plugins, dlls, textures, meshesAndAnims]) => {
-        setRawUnmanaged({
-          plugins,
-          dlls,
-          textures,
-          meshes: meshesAndAnims.meshes,
-          animations: meshesAndAnims.animations,
-          loading: false,
-        });
-      })
-      .catch(() => {
-        setRawUnmanaged(prev => ({ ...prev, loading: false }));
-      });
-
-
-  }, [gamePath, activeGameId, refreshKey]);
+    setRawUnmanaged({
+      plugins,
+      dlls,
+      textures,
+      meshes: meshesAndAnims.meshes,
+      animations: meshesAndAnims.animations,
+      loading: false,
+    });
+  })
+  .finally(() => {
+   log('info', 'Finished unmanaged files check', {
+      elapsedMs: Math.round(performance.now() - scanStarted),
+      cancelled,
+    });
+  });
+  return () => {  
+    cancelled = true;  
+  };  
+}, [gamePath, activeGameId, refreshKey, isDeployActive]);
 
 
   const totalUnmanaged = unmanagedFiles.plugins.length + unmanagedFiles.dlls.length +
@@ -1698,7 +1741,7 @@ function GameStatsPage({ api }) {
   const hasUnmanagedFiles = !unmanagedFiles.loading && totalUnmanaged > 0;
 
   // FNIS or Nemesis installed and enabled  
-  const hasFnisOrNemesisMods = Object.entries(mods).some(([modId, mod]) => {
+  const hasFnisOrNemesisMods = React.useMemo(() => modValues.some((mod) => {
     const name = (mod.attributes?.name || mod.id || '').toLowerCase();
     const isBad =
       name.includes('fnis data') ||
@@ -1706,17 +1749,13 @@ function GameStatsPage({ api }) {
       name.includes('nemesis unlimited behavior engine') ||
       name.includes('nemesis behavior engine');
 
-    const isEnabled = profile?.modState?.[modId]?.enabled === true;
-
-    return isBad && isEnabled;
-  });
+    return isBad && profile?.modState?.[mod.id]?.enabled === true;
+  }), [modValues, profile]);
 
   const fnisAutoRunEnabled = fnisAutoRunCheck;
   const fnisOrNemesisDetected = hasFnisOrNemesisMods || fnisAutoRunEnabled;
 
   // Suppressed notifications
-  const suppressedIds = Object.keys(suppressedNotifications)
-    .filter(id => suppressedNotifications[id] === true);
   const suppressedCount = suppressedIds.length;
 
 
@@ -1731,19 +1770,18 @@ function GameStatsPage({ api }) {
   };
 
   // Cross-reference with active notifications for severity (best-effort — dismissed ones show 'unknown')  
-  const suppressedWithType = suppressedIds.map(id => {
-
-    const notif = activeNotifications.find(n => n.id === id);
+  const suppressedWithType = React.useMemo(() => suppressedIds.map(id => {
+    const [message, type] = (activeNotificationDetails[id] || '').split('\u0000');
     return {
       id,
-      label: notif?.message ?? knownLabels[id] ?? id,  // falls back to raw ID if not active  
-      type: notif?.type ?? 'unknown',
+      label: message || knownLabels[id] || id,
+      type: type || 'unknown',
     };
-  });
+  }), [suppressedIds, activeNotificationDetails]);
 
-  const tooltipText = suppressedWithType
+  const tooltipText = React.useMemo(() => suppressedWithType
     .map(n => n.label)
-    .join('\n');
+    .join('\n'), [suppressedWithType]);
 
 
   // Build a map of modId -> [{ coll, type }, ...]  
@@ -1770,24 +1808,23 @@ function GameStatsPage({ api }) {
     return map;
   }, [mods]);
 
-  const enabledModIds = Object.keys(profile?.modState || {}).filter(
-    (modId) => profile.modState[modId]?.enabled === true,
+  const { enabledModIds, enabledModsCount, disabledCount, collectionCounts, noneCount } = React.useMemo(() => {
+    const enabledModIds = Object.keys(profile?.modState || {})
+      .filter((modId) => profile.modState[modId]?.enabled === true);
+    const regularMods = modValues.filter(m => m.type !== 'collection');
+    const disabledCount = regularMods.filter(m =>
+      m.state === 'installed' && profile?.modState?.[m.id]?.enabled !== true
+    ).length;
+    const collectionCounts = {};
+    let noneCount = 0;
 
-  );
-  const enabledModsCount = enabledModIds.length;
-  const regularMods = modValues.filter(m => m.type !== 'collection');
-  const disabledCount = regularMods.filter(m =>
-    m.state === 'installed' && profile?.modState?.[m.id]?.enabled !== true
-  ).length;
+    enabledModIds.forEach(modId => {
+      const modColls = collectionMap[modId];
+      if (!modColls || modColls.length === 0) {
+        noneCount++;
+        return;
+      }
 
-
-  const collectionCounts = {}; // name -> { total, required, optional }  
-  let noneCount = 0;
-  enabledModIds.forEach(modId => {
-    const modColls = collectionMap[modId];
-    if (!modColls || modColls.length === 0) {
-      noneCount++;
-    } else {
       modColls.forEach(({ coll, type }) => {
         const name = util.renderModName(coll) || coll.id;
         if (!collectionCounts[name]) {
@@ -1800,8 +1837,16 @@ function GameStatsPage({ api }) {
           collectionCounts[name].optional++;
         }
       });
-    }
-  });
+    });
+
+    return {
+      enabledModIds,
+      enabledModsCount: enabledModIds.length,
+      disabledCount,
+      collectionCounts,
+      noneCount,
+    };
+  }, [profile, modValues, collectionMap]);
 
 
 
@@ -1833,28 +1878,37 @@ function GameStatsPage({ api }) {
   };
 
   useEffect(() => {
+    log('info', 'Start reading plugin headers for isLight flag')
     if (!gamePath || gamePath === 'Not discovered') return;
+    if (isDeployActive) return;
     const dataPath = path.join(gamePath, 'Data');
     const ids = Object.keys(pluginList).filter(id =>
       pluginList[id]?.deployed || pluginList[id]?.isNative
     );
-    Promise.all(
-      ids.map(id => {
-        const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
-        return readPluginLightFlag(filePath)
-          .then(isLight => [id, isLight])
-          .catch(() => [id, false]);
-      })
-    ).then(results => {
-      setPluginHeaders(Object.fromEntries(results));
-    });
-  }, [gamePath, activeGameId, pluginList, refreshKey]);
+    const headerStarted = performance.now();
+
+Promise.all(
+  ids.map(id => {
+    const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
+    return readPluginLightFlag(filePath)
+      .then(isLight => [id, isLight])
+      .catch(() => [id, false]);
+  })
+).then(results => {
+  setPluginHeaders(Object.fromEntries(results));
+}).finally(() => {
+  log('info', 'Finished reading plugin header for isLight flag', {
+    count: ids.length,
+    elapsedMs: Math.round(performance.now() - headerStarted),
+  });
+});
+  }, [gamePath, activeGameId, pluginList, refreshKey, isDeployActive]);
 
 
   const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder]);
   const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders]);
   const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders]);
- // const missingMasters = React.useMemo(() => {
+ /* const missingMasters = React.useMemo(() => {
     const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));
     const result = {};
     activePlugins.forEach(id => {
@@ -1863,15 +1917,12 @@ function GameStatsPage({ api }) {
       if (missing.length > 0) result[id] = missing;
     });
     return result;
-  }, [activePlugins, pluginHeaders]);
+  }, [activePlugins, pluginHeaders]); */
 
   const regularLimit = eslGame ? 254 : 255;
   const lightLimit = 4096;
 
   const profileName = profile?.name || 'None';
-
-  const { shallowEqual } = require('react-redux');
-const { BADFAMILY } = require('dns');
 
   // Get profiles for the current game  
   const gameProfiles = useSelector((state) => {
@@ -1896,10 +1947,9 @@ const { BADFAMILY } = require('dns');
 
   const gameProfileCount = gameProfiles.length;
 
-  const engineInjectors = modValues.filter(
+  const engineInjectors = React.useMemo(() => modValues.filter(
     (mod) => mod.type === 'dinput' && mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true,
-
-  );
+  ), [modValues, profile]);
   const engineInjectorCount = engineInjectors.length;
 
   const hasSwapper = engineInjectors.some(m =>
@@ -1910,17 +1960,15 @@ const { BADFAMILY } = require('dns');
     (util.renderModName(m) || m.id).toLowerCase().includes('engine fixes - skse64 preloader')
   );
 
-  const installedCollections = modValues.filter(
+  const installedCollections = React.useMemo(() => modValues.filter(
     (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
-
-  );
+  ), [modValues, profile]);
   const collectionCount = installedCollections.length;
 
-  const mainCollectionAttributes = installedCollections.find(m => {
+  const mainCollectionAttributes = React.useMemo(() => installedCollections.find(m => {
     const modName = util.renderModName(m) || m.id;
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
-
-  },);
+  }), [installedCollections]);
   const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
   const baseCollectionName = mainCollectionAttributes
     ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
@@ -2090,6 +2138,7 @@ const { BADFAMILY } = require('dns');
 */
 
 function showFindWinningModDialog() {  
+  log('info', 'Start Find Mod Dialog')
   api.showDialog(  
     'question',  
     'Find Winning Mod',  
@@ -2137,9 +2186,11 @@ function showFindWinningModDialog() {
       'find-winning-mod-result',  
     );  
   });  
+  log('info','End file-ownership-search dialog')
 }
 
   useEffect(() => {
+    log('info','Checking Windows security logs for events blocking Vortex or SSE')
     async function getSkyrimSecurityEvents() {
 
       try {
@@ -2194,6 +2245,7 @@ if ($def_events) {'Defender Events Found'} else {''}
       }
     };
     getSkyrimSecurityEvents();
+    log('info','Finished searching logs for security events')
   }, [activeGameId, refreshKey]);
 
   
@@ -2313,7 +2365,7 @@ if ($def_events) {'Defender Events Found'} else {''}
               },
                 React.createElement('path', { d: (healthAsync.crashLogPresent && acknowledged == false) ? FOLDER_ALERT_OUTLINE : FOLDER_OPEN_OUTLINE })),
             ),
-            React.createElement(Dropdown.Menu, null,
+            React.createElement(Dropdown.Menu, { style: { transform: 'translateX(-20px)' } },
               React.createElement(MenuItem, { eventKey: 'a', onClick: () => { util.opn(skyrimLogsPath).catch(() => undefined); setOpen(false) } }, 'Skyrim Logs',
               healthAsync.crashLogPresent
                 ? React.createElement(Icon, { name: 'attention-required', style: { width: '16px', height: '16px', marginLeft: '10px' } })
