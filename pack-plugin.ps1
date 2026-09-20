@@ -10,7 +10,7 @@ while (Test-Path $dst) {
 $paths = @(
     "$PSScriptRoot\index.js",
     "$PSScriptRoot\info.json",
-    "$PSScriptRoot\helmet1.svg",
+    "$PSScriptRoot\helmet1.png",
     "$PSScriptRoot\icon.svg",
     "$PSScriptRoot\GameStatsPage.jsx"
 )

@@ -1634,15 +1634,16 @@ function GameStatsPage({ api }) {
     plugins: rawUnmanaged.plugins.filter(f => !pluginList[f.name.toLowerCase()]?.isNative),
   }), [rawUnmanaged, pluginList]);
 
-  const dataPath = path.join(gamePath, 'Data');
+  
 
  useEffect(() => {  
   log('info', 'Start unmanaged file walk')
   if (!gamePath || gamePath === 'Not discovered') return;  
-  
+  const dataPath = path.join(gamePath, 'Data');
   // Don't even start the scan if deployment is already running.  
   if (isDeployActive) {  
     setRawUnmanaged(prev => ({ ...prev, loading: false }));  
+    log('info', 'Deploy in progress. File walk cancelled')
     return;  
   }  
   
@@ -1652,7 +1653,7 @@ function GameStatsPage({ api }) {
   
   // Limit concurrent fs.statAsync calls so the scan doesn't compete  
   // heavily with deployment's own disk I/O.  
-  const limiter = new util.ConcurrencyLimiter(200);  
+  // const limiter = new util.ConcurrencyLimiter(200);  
   
   function walkUnmanaged(dirPath, maxDepth) {  
     if (cancelled || maxDepth <= 0) return Promise.resolve([]);  
@@ -1661,16 +1662,14 @@ function GameStatsPage({ api }) {
         if (cancelled) return [];  
         return Promise.all(  
           entries.map(entry => {  
-            if (cancelled || shouldSkip.has(entry)) return Promise.resolve([]);  
+if (cancelled || shouldSkip(entry)) return Promise.resolve([]);
             const fullPath = path.join(dirPath, entry);  
-            return limiter  
-              .do(() => fs.statAsync(fullPath))  
-              .then(stats => {  
-                if (cancelled) return [];  
-                if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);  
-                return stats.nlink <= 1  
-                  ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]  
-                  : [];  
+            return fs.statAsync(fullPath)
+              .then(stats => {
+                if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
+                return stats.nlink <= 1
+                  ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
+                  : [];
               })  
               .catch(() => []);  
           })  
@@ -1688,11 +1687,11 @@ function GameStatsPage({ api }) {
   const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>  
     files.filter(f => path.extname(f.name).toLowerCase() === '.dll')  
   );  
-  
+   
   const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 10).then(files =>  
     files.filter(f => ['.dds', '.png'].includes(path.extname(f.name).toLowerCase()))  
   );  
-  
+   
   const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 10)  
     .then(files => {  
       const meshes = [];  
@@ -1715,6 +1714,10 @@ Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
   .then(([plugins, dlls, textures, meshesAndAnims]) => {
     if (cancelled) return;
 
+    log('info', 'Plugin scan', {plugins: plugins});
+    log('info', 'DLL scan', {DLLs: dlls});
+    log('info', 'Texture scan', {Textures: textures});
+    log('info', 'Mesh and Animations scan', {MnA: meshesAndAnims});
     setRawUnmanaged({
       plugins,
       dlls,
