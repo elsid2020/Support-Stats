@@ -1,4 +1,4 @@
-const extensionVersion = "1.13.2";
+const extensionVersion = "1.13.3";
 const React = require('react');
 const { useSelector, useDispatch, shallowEqual } = require('react-redux');
 const { actions, selectors, util, fs, MainPage, log, Icon, IconButton, Toggle, Spinner, calculateFolderSize, OptionsFilter, Dropdown, DropdownButton } = require('vortex-api');
@@ -1980,8 +1980,8 @@ Promise.all(
     const modName = util.renderModName(m) || m.id;
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
   }), [installedCollections]);
-  // const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
-  const baseRevisionNumber = '101';
+  const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
+  
   const baseCollectionName = mainCollectionAttributes
     ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
     : undefined;
