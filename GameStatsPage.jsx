@@ -48,22 +48,26 @@ function shouldSkip(entry) {
 const expectedPluginCountMap = {
   'Immersive & Adult99': [440, 92],
   'Immersive & Adult100': [440, 92],
+  'Immersive & Adult101': [439, 92],
   'Immersive & Pure11': [396, 91],
   'Immersive & Pure12': [392, 93],
+  'Immersive & Pure13': [392, 93],
   'Immersive & Epic': [0, 0],
 };
 
 const expectedModCountMap = {
   'Immersive & Adult99': [547, 13],
   'Immersive & Adult100': [555, 13],
+  'Immersive & Adult101': [554, 13],
   'Immersive & Pure11': [477, 12],
   'Immersive & Pure12': [483, 13],
+  'Immersive & Pure13': [483, 13],
   'Immersive & Epic': [0, 0],
 };
 
 const supportedRevisions = {
-  'Immersive & Adult': ['99', '100'],
-  'Immersive & Pure': ['11', '12'],
+  'Immersive & Adult': ['99', '100', '101'],
+  'Immersive & Pure': ['11', '12', '13'],
   'Immersive & Epic': ['20'],
 };
 
@@ -1655,33 +1659,33 @@ function GameStatsPage({ api }) {
   // heavily with deployment's own disk I/O.  
   // const limiter = new util.ConcurrencyLimiter(200);  
   
-  function walkUnmanaged(dirPath, maxDepth) {  
-    if (cancelled || maxDepth <= 0) return Promise.resolve([]);  
-    return fs.readdirAsync(dirPath)  
-      .then(entries => {  
-        if (cancelled) return [];  
-        return Promise.all(  
-          entries.map(entry => {  
-if (cancelled || shouldSkip(entry)) return Promise.resolve([]);
-            const fullPath = path.join(dirPath, entry);  
-            return fs.statAsync(fullPath)
-              .then(stats => {
-                if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
-                return stats.nlink <= 1
-                  ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
-                  : [];
-              })  
-              .catch(() => []);  
-          })  
-        );  
-      })  
-      .then(results => [].concat(...results))  
-      .catch((err) => {  
-  log('warn', 'walkUnmanaged failed', { dirPath, error: err?.message });  
-  return [];  
-});  
-  }  
-  
+   function walkUnmanaged(dirPath, maxDepth) {
+     if (cancelled || maxDepth <= 0) return Promise.resolve([]);
+     return fs.readdirAsync(dirPath)
+       .then(entries => {
+         if (cancelled) return [];
+         return Promise.all(
+           entries.map(entry => {
+             if (cancelled || shouldSkip(entry)) return Promise.resolve([]);
+             const fullPath = path.join(dirPath, entry);
+             return fs.statAsync(fullPath)
+               .then(stats => {
+                 if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
+                 return stats.nlink <= 1
+                   ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
+                   : [];
+               })
+               .catch(() => []);
+           })
+         );
+       })
+       .then(results => [].concat(...results))
+       .catch((err) => {
+         log('warn', 'walkUnmanaged failed', { dirPath, error: err?.message });
+         return [];
+       });
+   }
+
   const scanPlugins = walkUnmanaged(dataPath, 1)  
     .then(files => files.filter(f =>  
       ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))  
@@ -1717,10 +1721,8 @@ Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
   .then(([plugins, dlls, textures, meshesAndAnims]) => {
     if (cancelled) return;
 
-    log('info', 'Plugin scan', {plugins: plugins});
-    log('info', 'DLL scan', {DLLs: dlls});
-    log('info', 'Texture scan', {Textures: textures});
-    log('info', 'Mesh and Animations scan', {MnA: meshesAndAnims});
+    log('info', 'Unmanaged scan', {plugins: plugins, DLLs: dlls, Textures: textures, MnA: meshesAndAnims });
+ 
     setRawUnmanaged({
       plugins,
       dlls,
@@ -1886,7 +1888,10 @@ Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
   useEffect(() => {
     log('info', 'Start reading plugin headers for isLight flag')
     if (!gamePath || gamePath === 'Not discovered') return;
-    if (isDeployActive) return;
+    if (isDeployActive) {
+      log('info','Deploy in progress. Reading headers cancelled ')
+      return;
+    };
     const dataPath = path.join(gamePath, 'Data');
     const ids = Object.keys(pluginList).filter(id =>
       pluginList[id]?.deployed || pluginList[id]?.isNative
@@ -1975,17 +1980,17 @@ Promise.all(
     const modName = util.renderModName(m) || m.id;
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
   }), [installedCollections]);
-  const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
+  // const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
+  const baseRevisionNumber = '101';
   const baseCollectionName = mainCollectionAttributes
     ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
     : undefined;
 
   const engineInjectorsGood = (
-    baseRevisionNumber == '99' || baseRevisionNumber == '11'
-      ? hasPreloader
-      : baseRevisionNumber == '100' || baseRevisionNumber == '12'
-        ? hasSwapper && hasPreloader
-        : false
+    baseRevisionNumber >= Number('100') || (baseRevisionNumber >= Number('12') && baseRevisionNumber <= Number('100'))
+      ? hasPreloader && hasSwapper
+      : hasPreloader
+    
   );
   const baseInstalledCollection = baseCollectionName + ' ' + baseRevisionNumber;
 
