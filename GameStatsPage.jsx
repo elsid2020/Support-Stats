@@ -2726,7 +2726,9 @@ if ($def_events) {'Defender Events Found'} else {''}
               row('Disabled Mods: ', `${disabledCount}`),
               row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                ...Object.entries(collectionCounts).map(([name, { total, required, optional }]) => {
+                ...Object.entries(collectionCounts)
+  .filter(([name]) => installedCollections.some(m => (util.renderModName(m) || m.id) === name))
+  .map(([name, { total, required, optional }]) => {
                   const mod = installedCollections.find(m => (util.renderModName(m) || m.id) === name);
                   const tooltipText = mod
                     ? (() => {
