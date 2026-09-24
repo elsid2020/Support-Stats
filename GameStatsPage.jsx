@@ -59,17 +59,17 @@ function shouldSkip(entry) {
 
 const expectedPluginCountMap = {
   'Immersive & Adult': {
-    99: [547, 13],
-    100: [555, 13],
-    101: [554, 13],
-    102: [554, 13],
+    99: [440, 92],
+    100: [440, 92],
+    101: [439, 92],
+    102: [439, 92],
 
   },
   'Immersive & Pure': {
-    11: [477, 12],
-    12: [483, 13],
-    13: [483, 13],
-    14: [483, 13],
+    11: [396, 91],
+    12: [392, 93],
+    13: [392, 93],
+    14: [392, 93],
     
   },
   'Immersive & Epic': {
@@ -565,7 +565,7 @@ function FaqItem({ heading, children, id }) {
       : null
   );
 }
-function buildFaqItems(api, gamePath, gameId, mainCollectionAttributes) {
+function buildFaqItems(api, gamePath, gameId, baseCollectionAttributes) {
   return [
     {
       heading: 'Crash to desktop when clicking new game:',
@@ -777,7 +777,7 @@ function buildFaqItems(api, gamePath, gameId, mainCollectionAttributes) {
               ];
               util.batchDispatch(api.store.dispatch, batched);
               // api.events.emit("show-main-page", "Collections");
-              api.events.emit("view-collection", `${mainCollectionAttributes.attributes.name}`, "mods")
+              api.events.emit("view-collection", `${baseCollectionAttributes.attributes.name}`, "mods")
             }
           }, 'View Optional Mods',), '  -OR-',
           ul(
@@ -2003,18 +2003,18 @@ Promise.all(
   );
 
   const installedCollections = React.useMemo(() => modValues.filter(
-    (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true, // mod.type === 'collection' && 
+    (mod) => mod.state === 'installed' && profile?.modState?.[mod.id]?.enabled === true && mod.type === 'collection'
   ), [modValues, profile]);
   const collectionCount = installedCollections.length;
 
-  const mainCollectionAttributes = React.useMemo(() => installedCollections.find(m => {
+  const baseCollectionAttributes = React.useMemo(() => installedCollections.find(m => {
     const modName = util.renderModName(m) || m.id;
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
   }), [installedCollections]);
-  const baseRevisionNumber = mainCollectionAttributes?.attributes?.revisionNumber;
+  const baseRevisionNumber = baseCollectionAttributes?.attributes?.revisionNumber;
   
-  const baseCollectionName = mainCollectionAttributes
-    ? (util.renderModName(mainCollectionAttributes) || mainCollectionAttributes.id)
+  const baseCollectionName = baseCollectionAttributes
+    ? (util.renderModName(baseCollectionAttributes) || baseCollectionAttributes.id)
     : undefined;
 
   const engineInjectorsGood = (
@@ -2095,7 +2095,7 @@ Promise.all(
     )
   }
 
-  const faqItems = React.useMemo(() => buildFaqItems(api, gamePath, activeGameId, mainCollectionAttributes), [api,gamePath,activeGameId,mainCollectionAttributes]);
+  const faqItems = React.useMemo(() => buildFaqItems(api, gamePath, activeGameId, baseCollectionAttributes), [api,gamePath,activeGameId,baseCollectionAttributes]);
 /*
   const [searchPath, setSearchPath] = useState('');
   const [manifestFiles, setManifestFiles] = useState([]);
