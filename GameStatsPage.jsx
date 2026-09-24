@@ -45,24 +45,54 @@ function shouldSkip(entry) {
   return exactSkip.has(entry) || suffixSkip.some((suf) => entry.endsWith(suf));  
 }
 
-const expectedPluginCountMap = {
+/* const expectedPluginCountMap = {
   'Immersive & Adult99': [440, 92],
   'Immersive & Adult100': [440, 92],
   'Immersive & Adult101': [439, 92],
+  'Immersive & Adult102': [439, 92],
   'Immersive & Pure11': [396, 91],
   'Immersive & Pure12': [392, 93],
   'Immersive & Pure13': [392, 93],
+  'Immersive & Pure14': [392, 93],
   'Immersive & Epic': [0, 0],
+}; */
+
+const expectedPluginCountMap = {
+  'Immersive & Adult': {
+    99: [547, 13],
+    100: [555, 13],
+    101: [554, 13],
+    102: [554, 13],
+
+  },
+  'Immersive & Pure': {
+    11: [477, 12],
+    12: [483, 13],
+    13: [483, 13],
+    14: [483, 13],
+    
+  },
+  'Immersive & Epic': {
+    2: [0,0],
+  }
 };
 
 const expectedModCountMap = {
-  'Immersive & Adult99': [547, 13],
-  'Immersive & Adult100': [555, 13],
-  'Immersive & Adult101': [554, 13],
-  'Immersive & Pure11': [477, 12],
-  'Immersive & Pure12': [483, 13],
-  'Immersive & Pure13': [483, 13],
-  'Immersive & Epic': [0, 0],
+  'Immersive & Adult': {
+    99: [547, 13],
+    100: [555, 13],
+    101: [554, 13],
+    102: [554, 13],
+  },
+  'Immersive & Pure': {
+    11: [477, 12],
+    12: [483, 13],
+    13: [483, 13],
+    14: [483, 13]
+    },
+  'Immersive & Epic': {
+      0: [0, 0]
+    }
 };
 
 const supportedRevisions = {
@@ -848,7 +878,8 @@ function GameStatsPage({ api }) {
   const { useEffect, useState, useRef } = React;
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
-  const [refreshKey, setRefreshKey] = React.useState(0);
+  
+  const [refreshKey, setRefreshKey] = React.useState(0); 
   const [open, setOpen] = React.useState(false);
   const [acknowledged, setAcknowledged] = React.useState(false); 
 
@@ -1998,8 +2029,8 @@ Promise.all(
     ([collection, revisions]) => `${collection} ${baseRevisionNumber}` === baseInstalledCollection // &&
     // revisions.includes(baseRevisionNumber)
   );
-  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
-  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName + baseRevisionNumber] ?? [0, 0];
+  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName][baseRevisionNumber] ?? [0, 0];
+  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName][baseRevisionNumber] ?? [0, 0];
 
   const expectedTotalPlugins = healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs + nativeExpected;
   const expectedTotalMods = healthAsync.aeDLCOwned === true ? collRequiredMods + collOptionalMods : collRequiredMods
@@ -2813,7 +2844,12 @@ if ($def_events) {'Defender Events Found'} else {''}
           ),
         ),
 
-        // ── Health Checks ──────────────────────────────────────────────────────────  
+ // ================================================== Health Checks ==========================================================================
+ //
+ //
+ //
+ //
+ //============================================================================================================================================  
         React.createElement('label', {
           className: 'nxm-checkbox-field' + (healthAsync.statsEnabled === true ? ' nxm-checkbox-checked' : ''),
           style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
@@ -2984,8 +3020,12 @@ if ($def_events) {'Defender Events Found'} else {''}
                       suppressedCount > 0 ? tooltipText : null),
 
 
-                    // ================================================== Base Collection Health Checks ==========================================================
-
+ // ================================================== Base Collection Health Checks ==========================================================
+ //
+ //
+ //
+ //
+ //============================================================================================================================================
 
                     validBaseCollection
                       ? [
