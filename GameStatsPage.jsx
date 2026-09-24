@@ -31,18 +31,18 @@ const iniFileMap = {
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
 const discordURL = "https://discord.gg/immersive-collections"
-const exactSkip = new Set([  
-  '__folder_managed_by_vortex',  
-  'vortex.deployment.json',  
-  'vortex.deployment.msgpack',  
-  'vortex.deployment.json.bak',  
-  'vortex.deployment.msgpack.bak',  
-  'user.json',  
-]);  
-const suffixSkip = ['.vortex_backup'];  
-  
-function shouldSkip(entry) {  
-  return exactSkip.has(entry) || suffixSkip.some((suf) => entry.endsWith(suf));  
+const exactSkip = new Set([
+  '__folder_managed_by_vortex',
+  'vortex.deployment.json',
+  'vortex.deployment.msgpack',
+  'vortex.deployment.json.bak',
+  'vortex.deployment.msgpack.bak',
+  'user.json',
+]);
+const suffixSkip = ['.vortex_backup'];
+
+function shouldSkip(entry) {
+  return exactSkip.has(entry) || suffixSkip.some((suf) => entry.endsWith(suf));
 }
 
 /* const expectedPluginCountMap = {
@@ -70,10 +70,10 @@ const expectedPluginCountMap = {
     12: [392, 93],
     13: [392, 93],
     14: [392, 93],
-    
+
   },
   'Immersive & Epic': {
-    2: [0,0],
+    2: [0, 0],
   }
 };
 
@@ -89,10 +89,10 @@ const expectedModCountMap = {
     12: [483, 13],
     13: [483, 13],
     14: [483, 13]
-    },
+  },
   'Immersive & Epic': {
-      0: [0, 0]
-    }
+    0: [0, 0]
+  }
 };
 
 const supportedRevisions = {
@@ -368,7 +368,7 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
   if (!isGood) {
     healthStatsBad++;
     // const listThemBaddies = badList.push(label);
-    
+
     const icon = isGood
       ? null //React.createElement('span', { style: { color: 'var(--brand-success)', marginRight: '6px', fontWeight: 'bold', alignItems: 'flex-start' } }, '✔')
       : label
@@ -878,10 +878,10 @@ function GameStatsPage({ api }) {
   const { useEffect, useState, useRef } = React;
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
-  
-  const [refreshKey, setRefreshKey] = React.useState(0); 
+
+  const [refreshKey, setRefreshKey] = React.useState(0);
   const [open, setOpen] = React.useState(false);
-  const [acknowledged, setAcknowledged] = React.useState(false); 
+  const [acknowledged, setAcknowledged] = React.useState(false);
 
   const gameInfo = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
@@ -1128,11 +1128,11 @@ function GameStatsPage({ api }) {
 
   const modValues = Object.values(mods);
 
-/*
-  const totalModsInstalled = modValues.filter(
-    m => m.type !== 'collection' && m.state === 'installed'
-  ).length;
-*/
+  /*
+    const totalModsInstalled = modValues.filter(
+      m => m.type !== 'collection' && m.state === 'installed'
+    ).length;
+  */
   const srsInstalled = React.useMemo(() => modValues.find(
     m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper')
   ), [modValues]);
@@ -1195,8 +1195,8 @@ function GameStatsPage({ api }) {
           resolve(match ? `${match[1]} (via Wine)` : 'Linux (via Wine)');
         });
       } else if (process.platform === 'win32') {
-        const command = 
-  'powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; (Get-WmiObject Win32_OperatingSystem).Caption"';
+        const command =
+          'powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; (Get-WmiObject Win32_OperatingSystem).Caption"';
         exec(
           command, { encoding: 'utf8' },
           (err, stdout) => {
@@ -1279,18 +1279,18 @@ function GameStatsPage({ api }) {
     state.settings?.gameMode?.discovered?.[activeGameId]?.tools ?? {}
   );
 
-/*  const toolList = Object.values(discoveredTools)
-    .filter(tool => tool.path != null && tool.hidden !== true)
-    .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
-
-  const MAX_VISIBLE_TOOLS = 5;
-  const [toolsExpanded, setToolsExpanded] = React.useState(false);
-
-  const visibleTools = toolsExpanded ? toolList : toolList.slice(0, MAX_VISIBLE_TOOLS);
-
-  const spaceUsed = gameInfo?.size?.value;
-  const spaceNoLinks = gameInfo?.size_nolinks?.value;
-*/
+  /*  const toolList = Object.values(discoveredTools)
+      .filter(tool => tool.path != null && tool.hidden !== true)
+      .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+  
+    const MAX_VISIBLE_TOOLS = 5;
+    const [toolsExpanded, setToolsExpanded] = React.useState(false);
+  
+    const visibleTools = toolsExpanded ? toolList : toolList.slice(0, MAX_VISIBLE_TOOLS);
+  
+    const spaceUsed = gameInfo?.size?.value;
+    const spaceNoLinks = gameInfo?.size_nolinks?.value;
+  */
   const [spaceUsed, setSpaceUsed] = React.useState(null);
   const [spaceNoLinks, setSpaceNoLinks] = React.useState(null);
 
@@ -1593,7 +1593,7 @@ function GameStatsPage({ api }) {
       }
     };
     newCrashlog();
-  }, [activeGameId, refreshKey]); 
+  }, [activeGameId, refreshKey]);
 
 
 
@@ -1669,110 +1669,110 @@ function GameStatsPage({ api }) {
     plugins: rawUnmanaged.plugins.filter(f => !pluginList[f.name.toLowerCase()]?.isNative),
   }), [rawUnmanaged, pluginList]);
 
-  
 
- useEffect(() => {  
-  log('info', 'Start unmanaged file walk')
-  if (!gamePath || gamePath === 'Not discovered') return;  
-  const dataPath = path.join(gamePath, 'Data');
-  // Don't even start the scan if deployment is already running.  
-  if (isDeployActive) {  
-    setRawUnmanaged(prev => ({ ...prev, loading: false }));  
-    log('info', 'Deploy in progress. File walk cancelled')
-    return;  
-  }  
-  
-  let cancelled = false;  
-  
-  setRawUnmanaged(prev => ({ ...prev, loading: true }));  
-  
-  // Limit concurrent fs.statAsync calls so the scan doesn't compete  
-  // heavily with deployment's own disk I/O.  
-  // const limiter = new util.ConcurrencyLimiter(200);  
-  
-   function walkUnmanaged(dirPath, maxDepth) {
-     if (cancelled || maxDepth <= 0) return Promise.resolve([]);
-     return fs.readdirAsync(dirPath)
-       .then(entries => {
-         if (cancelled) return [];
-         return Promise.all(
-           entries.map(entry => {
-             if (cancelled || shouldSkip(entry)) return Promise.resolve([]);
-             const fullPath = path.join(dirPath, entry);
-             return fs.statAsync(fullPath)
-               .then(stats => {
-                 if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
-                 return stats.nlink <= 1
-                   ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
-                   : [];
-               })
-               .catch(() => []);
-           })
-         );
-       })
-       .then(results => [].concat(...results))
-       .catch((err) => {
-         log('warn', 'walkUnmanaged failed', { dirPath, error: err?.message });
-         return [];
-       });
-   }
 
-  const scanPlugins = walkUnmanaged(dataPath, 1)  
-    .then(files => files.filter(f =>  
-      ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))  
-    );  
-  
-  const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>  
-    files.filter(f => path.extname(f.name).toLowerCase() === '.dll')  
-  );  
-   
-  const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 10).then(files =>  
-    files.filter(f => ['.dds', '.png'].includes(path.extname(f.name).toLowerCase()))  
-  );  
-   
-  const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 10)  
-    .then(files => {  
-      const meshes = [];  
-      const animations = [];  
-      files.forEach(f => {  
-        const ext = path.extname(f.name).toLowerCase();  
-        if (ext === '.hkx' || ext === '.hkb' || f.parentDir.toLowerCase() === 'animations') {  
-          animations.push(f);  
-        } else {  
-          meshes.push(f);  
-        }  
-      });  
-      return { meshes, animations };  
-    })  
-    .catch(() => ({ meshes: [], animations: [] }));  
-  
-  const scanStarted = performance.now();
+  useEffect(() => {
+    log('info', 'Start unmanaged file walk')
+    if (!gamePath || gamePath === 'Not discovered') return;
+    const dataPath = path.join(gamePath, 'Data');
+    // Don't even start the scan if deployment is already running.  
+    if (isDeployActive) {
+      setRawUnmanaged(prev => ({ ...prev, loading: false }));
+      log('info', 'Deploy in progress. File walk cancelled')
+      return;
+    }
 
-Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
-  .then(([plugins, dlls, textures, meshesAndAnims]) => {
-    if (cancelled) return;
+    let cancelled = false;
 
-    log('info', 'Unmanaged scan', {plugins: plugins, DLLs: dlls, Textures: textures, MnA: meshesAndAnims });
- 
-    setRawUnmanaged({
-      plugins,
-      dlls,
-      textures,
-      meshes: meshesAndAnims.meshes,
-      animations: meshesAndAnims.animations,
-      loading: false,
-    });
-  })
-  .finally(() => {
-   log('info', 'Finished unmanaged files check', {
-      elapsedMs: Math.round(performance.now() - scanStarted),
-      cancelled,
-    });
-  });
-  return () => {  
-    cancelled = true;  
-  };  
-}, [gamePath, activeGameId, refreshKey, isDeployActive]);
+    setRawUnmanaged(prev => ({ ...prev, loading: true }));
+
+    // Limit concurrent fs.statAsync calls so the scan doesn't compete  
+    // heavily with deployment's own disk I/O.  
+    // const limiter = new util.ConcurrencyLimiter(200);  
+
+    function walkUnmanaged(dirPath, maxDepth) {
+      if (cancelled || maxDepth <= 0) return Promise.resolve([]);
+      return fs.readdirAsync(dirPath)
+        .then(entries => {
+          if (cancelled) return [];
+          return Promise.all(
+            entries.map(entry => {
+              if (cancelled || shouldSkip(entry)) return Promise.resolve([]);
+              const fullPath = path.join(dirPath, entry);
+              return fs.statAsync(fullPath)
+                .then(stats => {
+                  if (stats.isDirectory()) return walkUnmanaged(fullPath, maxDepth - 1);
+                  return stats.nlink <= 1
+                    ? [{ name: entry, directory: dirPath, parentDir: path.basename(dirPath) }]
+                    : [];
+                })
+                .catch(() => []);
+            })
+          );
+        })
+        .then(results => [].concat(...results))
+        .catch((err) => {
+          log('warn', 'walkUnmanaged failed', { dirPath, error: err?.message });
+          return [];
+        });
+    }
+
+    const scanPlugins = walkUnmanaged(dataPath, 1)
+      .then(files => files.filter(f =>
+        ['.esp', '.esm', '.esl'].includes(path.extname(f.name).toLowerCase()))
+      );
+
+    const scanDlls = walkUnmanaged(path.join(dataPath, 'SKSE', 'Plugins'), 1).then(files =>
+      files.filter(f => path.extname(f.name).toLowerCase() === '.dll')
+    );
+
+    const scanTextures = walkUnmanaged(path.join(dataPath, 'textures'), 10).then(files =>
+      files.filter(f => ['.dds', '.png'].includes(path.extname(f.name).toLowerCase()))
+    );
+
+    const scanMeshesAndAnims = walkUnmanaged(path.join(dataPath, 'meshes'), 10)
+      .then(files => {
+        const meshes = [];
+        const animations = [];
+        files.forEach(f => {
+          const ext = path.extname(f.name).toLowerCase();
+          if (ext === '.hkx' || ext === '.hkb' || f.parentDir.toLowerCase() === 'animations') {
+            animations.push(f);
+          } else {
+            meshes.push(f);
+          }
+        });
+        return { meshes, animations };
+      })
+      .catch(() => ({ meshes: [], animations: [] }));
+
+    const scanStarted = performance.now();
+
+    Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
+      .then(([plugins, dlls, textures, meshesAndAnims]) => {
+        if (cancelled) return;
+
+        log('info', 'Unmanaged scan', { plugins: plugins, DLLs: dlls, Textures: textures, MnA: meshesAndAnims });
+
+        setRawUnmanaged({
+          plugins,
+          dlls,
+          textures,
+          meshes: meshesAndAnims.meshes,
+          animations: meshesAndAnims.animations,
+          loading: false,
+        });
+      })
+      .finally(() => {
+        log('info', 'Finished unmanaged files check', {
+          elapsedMs: Math.round(performance.now() - scanStarted),
+          cancelled,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gamePath, activeGameId, refreshKey, isDeployActive]);
 
 
   const totalUnmanaged = unmanagedFiles.plugins.length + unmanagedFiles.dlls.length +
@@ -1920,7 +1920,7 @@ Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
     log('info', 'Start reading plugin headers for isLight flag')
     if (!gamePath || gamePath === 'Not discovered') return;
     if (isDeployActive) {
-      log('info','Deploy in progress. Reading headers cancelled ')
+      log('info', 'Deploy in progress. Reading headers cancelled ')
       return;
     };
     const dataPath = path.join(gamePath, 'Data');
@@ -1929,37 +1929,37 @@ Promise.all([scanPlugins, scanDlls, scanTextures, scanMeshesAndAnims])
     );
     const headerStarted = performance.now();
 
-Promise.all(
-  ids.map(id => {
-    const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
-    return readPluginLightFlag(filePath)
-      .then(isLight => [id, isLight])
-      .catch(() => [id, false]);
-  })
-).then(results => {
-  setPluginHeaders(Object.fromEntries(results));
-}).finally(() => {
-  log('info', 'Finished reading plugin header for isLight flag', {
-    count: ids.length,
-    elapsedMs: Math.round(performance.now() - headerStarted),
-  });
-});
+    Promise.all(
+      ids.map(id => {
+        const filePath = pluginList[id]?.filePath || path.join(dataPath, id);
+        return readPluginLightFlag(filePath)
+          .then(isLight => [id, isLight])
+          .catch(() => [id, false]);
+      })
+    ).then(results => {
+      setPluginHeaders(Object.fromEntries(results));
+    }).finally(() => {
+      log('info', 'Finished reading plugin header for isLight flag', {
+        count: ids.length,
+        elapsedMs: Math.round(performance.now() - headerStarted),
+      });
+    });
   }, [gamePath, activeGameId, pluginList, refreshKey, isDeployActive]);
 
 
   const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder]);
   const lightPlugins = React.useMemo(() => eslGame ? activePlugins.filter(isLight) : [], [activePlugins, pluginInfo, pluginHeaders]);
   const regularPlugins = React.useMemo(() => activePlugins.filter((id) => !isLight(id)), [activePlugins, pluginInfo, pluginHeaders]);
- /* const missingMasters = React.useMemo(() => {
-    const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));
-    const result = {};
-    activePlugins.forEach(id => {
-      const masters = pluginHeaders[id]?.masterList ?? [];
-      const missing = masters.filter(m => !activeSet.has(m.toLowerCase()));
-      if (missing.length > 0) result[id] = missing;
-    });
-    return result;
-  }, [activePlugins, pluginHeaders]); */
+  /* const missingMasters = React.useMemo(() => {
+     const activeSet = new Set(activePlugins.map(id => id.toLowerCase()));
+     const result = {};
+     activePlugins.forEach(id => {
+       const masters = pluginHeaders[id]?.masterList ?? [];
+       const missing = masters.filter(m => !activeSet.has(m.toLowerCase()));
+       if (missing.length > 0) result[id] = missing;
+     });
+     return result;
+   }, [activePlugins, pluginHeaders]); */
 
   const regularLimit = eslGame ? 254 : 255;
   const lightLimit = 4096;
@@ -2012,7 +2012,8 @@ Promise.all(
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
   }), [installedCollections]);
   const baseRevisionNumber = baseCollectionAttributes?.attributes?.revisionNumber;
-  
+ // const baseRevisionNumber = 102;
+
   const baseCollectionName = baseCollectionAttributes
     ? (util.renderModName(baseCollectionAttributes) || baseCollectionAttributes.id)
     : undefined;
@@ -2021,7 +2022,7 @@ Promise.all(
     baseRevisionNumber >= Number('100') || (baseRevisionNumber >= Number('12') && baseRevisionNumber <= Number('100'))
       ? hasPreloader && hasSwapper
       : hasPreloader
-    
+
   );
   const baseInstalledCollection = baseCollectionName + ' ' + baseRevisionNumber;
 
@@ -2095,38 +2096,97 @@ Promise.all(
     )
   }
 
-  const faqItems = React.useMemo(() => buildFaqItems(api, gamePath, activeGameId, baseCollectionAttributes), [api,gamePath,activeGameId,baseCollectionAttributes]);
-/*
-  const [searchPath, setSearchPath] = useState('');
-  const [manifestFiles, setManifestFiles] = useState([]);
-  const [result, setResult] = useState(null);
-
-  // Load the manifest once (or on refresh), not per-keystroke  
-  useEffect(() => {
-    util.getManifest(api).then(manifest => setManifestFiles(manifest.files));
-  }, []);
-
-  const onSearch = (value) => {
-    setSearchPath(value);
-    const normalized = value.trim().replace(/\//g, '\\').toLowerCase();
-    const match = manifestFiles.find(f => f.relPath.toLowerCase() === normalized);
-    setResult(match ? match.source : null);
-  };
+  const faqItems = React.useMemo(() => buildFaqItems(api, gamePath, activeGameId, baseCollectionAttributes), [api, gamePath, activeGameId, baseCollectionAttributes]);
+  /*
+    const [searchPath, setSearchPath] = useState('');
+    const [manifestFiles, setManifestFiles] = useState([]);
+    const [result, setResult] = useState(null);
+  
+    // Load the manifest once (or on refresh), not per-keystroke  
+    useEffect(() => {
+      util.getManifest(api).then(manifest => setManifestFiles(manifest.files));
+    }, []);
+  
+    const onSearch = (value) => {
+      setSearchPath(value);
+      const normalized = value.trim().replace(/\//g, '\\').toLowerCase();
+      const match = manifestFiles.find(f => f.relPath.toLowerCase() === normalized);
+      setResult(match ? match.source : null);
+    };
+  
+    function showFindWinningModDialog() {
+      api.showDialog(
+        'question',
+        'Find Winning Mod',
+        {
+          text: 'Enter a file path (relative to the game data folder) to find which mod currently owns it.',
+          input: [
+            {
+              id: 'filePath',
+              type: 'text',
+              label: 'File path',
+              placeholder: 'e.g. meshes\\foo.nif',
+            },
+          ],
+        },
+        [{ label: 'Cancel' }, { label: 'Search', default: true }],
+      ).then((result) => {
+        if (result.action !== 'Search') {
+          return;
+        }
+        const query = (result.input.filePath || '').trim();
+        if (query.length === 0) {
+          return;
+        }
+  
+        util.getManifest(api)
+          .then((manifest) => {
+            const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');
+            const matches = manifest.files.filter(
+              normalizedQuery.includes('\\')
+                ? (f) => f.relPath.toLowerCase().endsWith(normalizedQuery)
+                : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),
+            );
+  
+            const sortedMatches = matches.sort((a, b) => {
+              const bySource = a.source.toLowerCase().localeCompare(b.source.toLowerCase());
+              if (bySource !== 0) return bySource;
+              return a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase());
+            });
+            const resultText = sortedMatches.length > 0
+              ? sortedMatches.map(m => `${m.relPath} -> ${m.source}`).join('\n')
+              : `No deployed file matching "${query}" was found in the manifest.`
+  
+            api.showDialog(
+              'info',
+              'Search Result',
+              {
+                htmlText: '<style>'
+                  + '#find-winning-mod-result { display: flex !important; align-items: center; }'
+                  + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'
+                  + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'
+                  + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
+                  + '</style>',
+                text: resultText,
+              },
+              [{ label: 'Close' }],
+              'find-winning-mod-result',
+            );
+          })
+          .catch((err) => {
+            api.showErrorNotification('Failed to read deployment manifest', err);
+          });
+      });
+    };
+  */
 
   function showFindWinningModDialog() {
+    log('info', 'Start Find Mod Dialog')
     api.showDialog(
       'question',
       'Find Winning Mod',
       {
-        text: 'Enter a file path (relative to the game data folder) to find which mod currently owns it.',
-        input: [
-          {
-            id: 'filePath',
-            type: 'text',
-            label: 'File path',
-            placeholder: 'e.g. meshes\\foo.nif',
-          },
-        ],
+        input: [{ id: 'filePath', type: 'text', label: 'File path or filename' }],
       },
       [{ label: 'Cancel' }, { label: 'Search', default: true }],
     ).then((result) => {
@@ -2134,105 +2194,46 @@ Promise.all(
         return;
       }
       const query = (result.input.filePath || '').trim();
-      if (query.length === 0) {
+      if (!query) {
         return;
       }
 
-      util.getManifest(api)
-        .then((manifest) => {
-          const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');
-          const matches = manifest.files.filter(
-            normalizedQuery.includes('\\')
-              ? (f) => f.relPath.toLowerCase().endsWith(normalizedQuery)
-              : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),
-          );
+      const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');
+      const matches = manifest?.files?.filter(
+        normalizedQuery.includes('\\')
+          ? (f) => f.relPath.toLowerCase() === normalizedQuery
+          : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),
+      ) ?? [];
 
-          const sortedMatches = matches.sort((a, b) => {
-            const bySource = a.source.toLowerCase().localeCompare(b.source.toLowerCase());
-            if (bySource !== 0) return bySource;
-            return a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase());
-          });
-          const resultText = sortedMatches.length > 0
-            ? sortedMatches.map(m => `${m.relPath} -> ${m.source}`).join('\n')
-            : `No deployed file matching "${query}" was found in the manifest.`
+      const sortedMatches = matches
+        .slice()
+        .sort((a, b) => a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase()));
 
-          api.showDialog(
-            'info',
-            'Search Result',
-            {
-              htmlText: '<style>'
-                + '#find-winning-mod-result { display: flex !important; align-items: center; }'
-                + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'
-                + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'
-                + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
-                + '</style>',
-              text: resultText,
-            },
-            [{ label: 'Close' }],
-            'find-winning-mod-result',
-          );
-        })
-        .catch((err) => {
-          api.showErrorNotification('Failed to read deployment manifest', err);
-        });
+      const resultText = sortedMatches.length > 0
+        ? sortedMatches.map((m) => `${m.relPath} -> ${m.source}`).join('\n')
+        : 'No matching file found in the deployment manifest.';
+
+      api.showDialog(
+        'info',
+        'Search Result',
+        {
+          htmlText: '<style>'
+            + '#find-winning-mod-result { display: flex !important; align-items: center; }'
+            + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'
+            + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'
+            + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
+            + '</style>',
+          text: resultText,
+        },
+        [{ label: 'Close' }],
+        'find-winning-mod-result',
+      );
     });
-  };
-*/
-
-function showFindWinningModDialog() {  
-  log('info', 'Start Find Mod Dialog')
-  api.showDialog(  
-    'question',  
-    'Find Winning Mod',  
-    {  
-      input: [{ id: 'filePath', type: 'text', label: 'File path or filename' }],  
-    },  
-    [{ label: 'Cancel' }, { label: 'Search', default: true }],  
-  ).then((result) => {  
-    if (result.action !== 'Search') {  
-      return;  
-    }  
-    const query = (result.input.filePath || '').trim();  
-    if (!query) {  
-      return;  
-    }  
-  
-    const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');  
-    const matches = manifest?.files?.filter(  
-      normalizedQuery.includes('\\')  
-        ? (f) => f.relPath.toLowerCase() === normalizedQuery  
-        : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),  
-    ) ?? [];  
-  
-    const sortedMatches = matches  
-      .slice()  
-      .sort((a, b) => a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase()));  
-  
-    const resultText = sortedMatches.length > 0  
-      ? sortedMatches.map((m) => `${m.relPath} -> ${m.source}`).join('\n')  
-      : 'No matching file found in the deployment manifest.';  
-  
-    api.showDialog(  
-      'info',  
-      'Search Result',  
-      {  
-        htmlText: '<style>'  
-          + '#find-winning-mod-result { display: flex !important; align-items: center; }'  
-          + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'  
-          + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'  
-          + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'  
-          + '</style>',  
-        text: resultText,  
-      },  
-      [{ label: 'Close' }],  
-      'find-winning-mod-result',  
-    );  
-  });  
-  log('info','End file-ownership-search dialog')
-}
+    log('info', 'End file-ownership-search dialog')
+  }
 
   useEffect(() => {
-    log('info','Checking Windows security logs for events blocking Vortex or SSE')
+    log('info', 'Checking Windows security logs for events blocking Vortex or SSE')
     async function getSkyrimSecurityEvents() {
 
       try {
@@ -2273,24 +2274,24 @@ if ($def_events) {'Defender Events Found'} else {''}
           { encoding: 'utf8' }
         );
 
-      
 
-  
-  
+
+
+
         const result = stdout.trim();
-  
+
         setHealthAsync((p) => ({ ...p, securityEvents: result ? result : false, }));
 
       } catch (error) {
-                
+
         setHealthAsync((p) => ({ ...p, securityEvents: "error" }));
       }
     };
     getSkyrimSecurityEvents();
-    log('info','Finished searching logs for security events')
+    log('info', 'Finished searching logs for security events')
   }, [activeGameId, refreshKey]);
 
-  
+
   //=========================== Render the page  ==========================================================
 
   /* return React.createElement(MainPage, null,
@@ -2390,11 +2391,11 @@ if ($def_events) {'Defender Events Found'} else {''}
           React.createElement(Dropdown, {
             id: 'open-folders-dropdown',
             open: open,
-            onToggle: (isOpen) => { 
+            onToggle: (isOpen) => {
               setOpen(isOpen);
               if (isOpen) setAcknowledged(true);
+            },
           },
-        },
             React.createElement(Dropdown.Toggle, {
               noCaret: false,
               className: 'btn-embed',
@@ -2409,9 +2410,9 @@ if ($def_events) {'Defender Events Found'} else {''}
             ),
             React.createElement(Dropdown.Menu, { style: { transform: 'translateX(-20px)' } },
               React.createElement(MenuItem, { eventKey: 'a', onClick: () => { util.opn(skyrimLogsPath).catch(() => undefined); setOpen(false) } }, 'Skyrim Logs',
-              healthAsync.crashLogPresent
-                ? React.createElement(Icon, { name: 'attention-required', style: { width: '16px', height: '16px', marginLeft: '10px' } })
-                : null),
+                healthAsync.crashLogPresent
+                  ? React.createElement(Icon, { name: 'attention-required', style: { width: '16px', height: '16px', marginLeft: '10px' } })
+                  : null),
               React.createElement(MenuItem, { eventKey: 'b', onClick: () => { util.opn(vortexLogsPath).catch(() => undefined); setOpen(false); } }, 'Vortex Logs'),
               React.createElement(MenuItem, { eventKey: 'c', onClick: () => { util.opn(gamePath).catch(() => undefined); setOpen(false); } }, 'Game Folder'),
             ),
@@ -2687,7 +2688,7 @@ if ($def_events) {'Defender Events Found'} else {''}
                   React.createElement('strong', null, 'Engine Injectors:'),
                   engineInjectorCount > 0
                     ? React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
-                      engineInjectors.map(injector => React.createElement('li', { key: injector.id }, injector.attributes?.customFileName, ` - v${injector.attributes?.version.replace(/^v/, '')}`),))
+                      engineInjectors.map(injector => React.createElement('li', { key: injector.id }, injector.attributes?.customFileName, ` - v${injector.attributes?.version?.replace(/^v/, '')}`),))
                     : ' None found',
 
 
@@ -2727,23 +2728,23 @@ if ($def_events) {'Defender Events Found'} else {''}
               row(`Collection(s) ${collectionCount}: Enabled mods, (required + optional)`, null),
               React.createElement('ul', { style: { margin: '4px 0', paddingLeft: '20px' } },
                 ...Object.entries(collectionCounts)
-  .filter(([name]) => installedCollections.some(m => (util.renderModName(m) || m.id) === name))
-  .map(([name, { total, required, optional }]) => {
-                  const mod = installedCollections.find(m => (util.renderModName(m) || m.id) === name);
-                  const tooltipText = mod
-                    ? (() => {
-                      const stats = getCollectionStats(mod, mods, profile);
-                      return `Enabled: ${stats.enabled}\n` +
-                        `Disabled: ${stats.disabled}\n` +
-                        `Not Installed: ${stats.notInstalled}\n` +
-                        `Ignored: ${stats.ignored}`;
-                    })()
-                    : undefined;
+                  .filter(([name]) => installedCollections.some(m => (util.renderModName(m) || m.id) === name))
+                  .map(([name, { total, required, optional }]) => {
+                    const mod = installedCollections.find(m => (util.renderModName(m) || m.id) === name);
+                    const tooltipText = mod
+                      ? (() => {
+                        const stats = getCollectionStats(mod, mods, profile);
+                        return `Enabled: ${stats.enabled}\n` +
+                          `Disabled: ${stats.disabled}\n` +
+                          `Not Installed: ${stats.notInstalled}\n` +
+                          `Ignored: ${stats.ignored}`;
+                      })()
+                      : undefined;
 
-                  return React.createElement('li', { key: name, title: tooltipText },
-                    `${name}: ${total} `, React.createElement('span', { style: { fontSize: '12px', opacity: 0.75 } }, `(${required} + ${optional})`),
-                  );
-                }),
+                    return React.createElement('li', { key: name, title: tooltipText },
+                      `${name}: ${total} `, React.createElement('span', { style: { fontSize: '12px', opacity: 0.75 } }, `(${required} + ${optional})`),
+                    );
+                  }),
                 React.createElement('li', { key: '__none__' },
                   React.createElement('span', {
                     style: { color: 'var(--link-color)', cursor: 'pointer' },
@@ -2846,12 +2847,12 @@ if ($def_events) {'Defender Events Found'} else {''}
           ),
         ),
 
- // ================================================== Health Checks ==========================================================================
- //
- //
- //
- //
- //============================================================================================================================================  
+        // ================================================== Health Checks ==========================================================================
+        //
+        //
+        //
+        //
+        //============================================================================================================================================  
         React.createElement('label', {
           className: 'nxm-checkbox-field' + (healthAsync.statsEnabled === true ? ' nxm-checkbox-checked' : ''),
           style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
@@ -3022,12 +3023,12 @@ if ($def_events) {'Defender Events Found'} else {''}
                       suppressedCount > 0 ? tooltipText : null),
 
 
- // ================================================== Base Collection Health Checks ==========================================================
- //
- //
- //
- //
- //============================================================================================================================================
+                    // ================================================== Base Collection Health Checks ==========================================================
+                    //
+                    //
+                    //
+                    //
+                    //============================================================================================================================================
 
                     validBaseCollection
                       ? [
@@ -3126,7 +3127,7 @@ if ($def_events) {'Defender Events Found'} else {''}
 
 
                         // ? healthRow((mainRevisionNumber == 100 && engineInjectorCount < 3) || (mainRevisionNumber == 99 && engineInjectorCount < 2)
-                       healthRow(engineInjectorsGood
+                        healthRow(engineInjectorsGood
                           ? null
                           : 'Engine Injector mod missing',
                           engineInjectorsGood,
@@ -3145,11 +3146,11 @@ if ($def_events) {'Defender Events Found'} else {''}
                             },
                           engineInjectors.forEach((injector, index) => { }
                           )),
-                        healthRow(healthAsync.securityEvents ? 'Windows Security Events' : null, !healthAsync.securityEvents , false,
-                        null, healthAsync.securityEvents), 
+                        healthRow(healthAsync.securityEvents ? 'Windows Security Events' : null, !healthAsync.securityEvents, false,
+                          null, healthAsync.securityEvents),
                       ]
                       : null,
-                    healthStatsBad == 0                    
+                    healthStatsBad == 0
                       ? React.createElement('span', { style: { alignItems: 'left', alignContent: 'center', fontSize: "14pt", gridColumn: '2' }, title: "No obvious problems found" },
                         reallyGoodRow("Health Stats look good!"))
                       : null,
