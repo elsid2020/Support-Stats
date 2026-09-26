@@ -2030,8 +2030,8 @@ function GameStatsPage({ api }) {
     ([collection, revisions]) => `${collection} ${baseRevisionNumber}` === baseInstalledCollection // &&
     // revisions.includes(baseRevisionNumber)
   );
-  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName][baseRevisionNumber] ?? [0, 0];
-  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName][baseRevisionNumber] ?? [0, 0];
+  const [collRequiredPlugs, collOptionalPlugs] = expectedPluginCountMap[baseCollectionName]?.[baseRevisionNumber] ?? [0, 0];
+  const [collRequiredMods, collOptionalMods] = expectedModCountMap[baseCollectionName]?.[baseRevisionNumber] ?? [0, 0];
 
   const expectedTotalPlugins = healthAsync.aeDLCOwned === true ? collOptionalPlugs + nativeExpected + collRequiredPlugs : collRequiredPlugs + nativeExpected;
   const expectedTotalMods = healthAsync.aeDLCOwned === true ? collRequiredMods + collOptionalMods : collRequiredMods
