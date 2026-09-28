@@ -45,17 +45,6 @@ function shouldSkip(entry) {
   return exactSkip.has(entry) || suffixSkip.some((suf) => entry.endsWith(suf));
 }
 
-/* const expectedPluginCountMap = {
-  'Immersive & Adult99': [440, 92],
-  'Immersive & Adult100': [440, 92],
-  'Immersive & Adult101': [439, 92],
-  'Immersive & Adult102': [439, 92],
-  'Immersive & Pure11': [396, 91],
-  'Immersive & Pure12': [392, 93],
-  'Immersive & Pure13': [392, 93],
-  'Immersive & Pure14': [392, 93],
-  'Immersive & Epic': [0, 0],
-}; */
 
 const expectedPluginCountMap = {
   'Immersive & Adult': {
@@ -876,6 +865,7 @@ function GameStatsPage({ api }) {
   const gameName = game ? game.name : 'Unknown';
 
   const { useEffect, useState, useRef } = React;
+  
   const rawIniPaths = getIniPaths(activeGameId);
   const displayIniPaths = rawIniPaths.map(displayPath);
 
@@ -896,7 +886,13 @@ function GameStatsPage({ api }) {
   });
   const exeVersion = require('exe-version');
   const gamePath = gameDiscovery?.path || 'Not discovered';
-  const gameVersion = exeVersion.getProductVersionLocalized(path.join(gamePath, 'SkyrimSE.exe'));
+  // const gameVersion = exeVersion.getProductVersionLocalized(path.join(gamePath, 'SkyrimSE.exe'));
+  const gameVersion = React.useMemo(() => {  
+    if (gamePath === 'Not discovered') return 'Unknown';  
+    try {  
+      return exeVersion.getProductVersionLocalized(path.join(gamePath, 'SkyrimSE.exe'));  
+    } catch { return 'Unknown'; }  
+  }, [gamePath]);
 
   const steamGame = gamePath.toLowerCase().includes('\\steamapps\\common\\skyrim special edition');
   const mods = useSelector((state) => {
@@ -1133,9 +1129,11 @@ function GameStatsPage({ api }) {
       m => m.type !== 'collection' && m.state === 'installed'
     ).length;
   */
-  const srsInstalled = React.useMemo(() => modValues.find(
-    m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper')
-  ), [modValues]);
+  const srsInstalled = React.useMemo(() => {
+    Object.values(mods).find(
+    m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper'))
+    console.log('=====Runs every')
+}, [mods]);
 
   const [hardwareInfo, setHardwareInfo] = React.useState({
     cpu: 'Loading...',
@@ -1144,39 +1142,36 @@ function GameStatsPage({ api }) {
     os: 'Loading...',
   });
 
-  React.useEffect(() => {
-    let cancelled = false;
-    beginCheck();
-    const { exec } = require('child_process');
-    // OS  
-    getOSFlavor().then(flavor =>
-      setHardwareInfo(prev => ({ ...prev, os: flavor }))
-    );
-
-    // CPU — synchronous  
-    const cpus = os.cpus();
-    if (cpus && cpus.length > 0) {
-      setHardwareInfo(prev => ({ ...prev, cpu: cpus[0].model.trim() }));
-    }
-
-    // RAM — synchronous  
-    const totalRam = os.totalmem();
-    setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));
-
-    // GPU
-    if (process.platform === 'win32') {
-      // Will work for Wine or Windows  
-      let cancelled = false;
-
-      getGpuList().then((list) => {
-        if (cancelled) return;
-        setHealthAsync((p) => ({ ...p, gpu: list }));
-      });
-    }
-    return () => { cancelled = true; };
-
+  React.useEffect(() => {  
+    let cancelled = false;  
+    const { exec } = require('child_process');  
+    // OS    
+    getOSFlavor().then(flavor => {  
+      if (cancelled) return;  
+      setHardwareInfo(prev => ({ ...prev, os: flavor }));  
+    });  
+  
+    // CPU — synchronous    
+    const cpus = os.cpus();  
+    if (cpus && cpus.length > 0) {  
+      setHardwareInfo(prev => ({ ...prev, cpu: cpus[0].model.trim() }));  
+    }  
+  
+    // RAM — synchronous    
+    const totalRam = os.totalmem();  
+    setHardwareInfo(prev => ({ ...prev, ram: (totalRam / (1024 ** 3)).toFixed(1) + ' GB' }));  
+  
+    // GPU  
+    if (process.platform === 'win32') {  
+      // Will work for Wine or Windows    
+      getGpuList().then((list) => {  
+        if (cancelled) return;  
+        setHealthAsync((p) => ({ ...p, gpu: list }));  
+      });  
+    }  
+    return () => { cancelled = true; };  
+  
   }, []);
-
 
   function getOSFlavor() {
     return new Promise((resolve) => {
@@ -1225,17 +1220,15 @@ function GameStatsPage({ api }) {
   );
   const suppressedIds = React.useMemo(() => Object.keys(suppressedNotifications)
     .filter(id => suppressedNotifications[id] === true), [suppressedNotifications]);
-  const activeNotificationDetails = useSelector((state) => {
-    const notifications = state.session.notifications.notifications || [];
-    const details = {};
-    suppressedIds.forEach((id) => {
-      const notification = notifications.find(item => item.id === id);
-      details[id] = notification
-        ? `${notification.message}\u0000${notification.type}`
-        : '';
-    });
-    return details;
-  }, shallowEqual);
+  const notifications = useSelector(state => state.session.notifications.notifications || []);  
+const activeNotificationDetails = React.useMemo(() => {  
+  const details = {};  
+  suppressedIds.forEach(id => {  
+    const n = notifications.find(item => item.id === id);  
+    details[id] = n ? `${n.message}\u0000${n.type}` : '';  
+  });  
+  return details;  
+}, [notifications, suppressedIds]);
   const needToDeploy = useSelector((state) =>
     state.persistent?.deployment?.needToDeploy?.[activeGameId] === true
   );
@@ -2097,89 +2090,7 @@ function GameStatsPage({ api }) {
   }
 
   const faqItems = React.useMemo(() => buildFaqItems(api, gamePath, activeGameId, baseCollectionAttributes), [api, gamePath, activeGameId, baseCollectionAttributes]);
-  /*
-    const [searchPath, setSearchPath] = useState('');
-    const [manifestFiles, setManifestFiles] = useState([]);
-    const [result, setResult] = useState(null);
   
-    // Load the manifest once (or on refresh), not per-keystroke  
-    useEffect(() => {
-      util.getManifest(api).then(manifest => setManifestFiles(manifest.files));
-    }, []);
-  
-    const onSearch = (value) => {
-      setSearchPath(value);
-      const normalized = value.trim().replace(/\//g, '\\').toLowerCase();
-      const match = manifestFiles.find(f => f.relPath.toLowerCase() === normalized);
-      setResult(match ? match.source : null);
-    };
-  
-    function showFindWinningModDialog() {
-      api.showDialog(
-        'question',
-        'Find Winning Mod',
-        {
-          text: 'Enter a file path (relative to the game data folder) to find which mod currently owns it.',
-          input: [
-            {
-              id: 'filePath',
-              type: 'text',
-              label: 'File path',
-              placeholder: 'e.g. meshes\\foo.nif',
-            },
-          ],
-        },
-        [{ label: 'Cancel' }, { label: 'Search', default: true }],
-      ).then((result) => {
-        if (result.action !== 'Search') {
-          return;
-        }
-        const query = (result.input.filePath || '').trim();
-        if (query.length === 0) {
-          return;
-        }
-  
-        util.getManifest(api)
-          .then((manifest) => {
-            const normalizedQuery = query.toLowerCase().replace(/\//g, '\\');
-            const matches = manifest.files.filter(
-              normalizedQuery.includes('\\')
-                ? (f) => f.relPath.toLowerCase().endsWith(normalizedQuery)
-                : (f) => path.basename(f.relPath).toLowerCase() === path.basename(normalizedQuery),
-            );
-  
-            const sortedMatches = matches.sort((a, b) => {
-              const bySource = a.source.toLowerCase().localeCompare(b.source.toLowerCase());
-              if (bySource !== 0) return bySource;
-              return a.relPath.toLowerCase().localeCompare(b.relPath.toLowerCase());
-            });
-            const resultText = sortedMatches.length > 0
-              ? sortedMatches.map(m => `${m.relPath} -> ${m.source}`).join('\n')
-              : `No deployed file matching "${query}" was found in the manifest.`
-  
-            api.showDialog(
-              'info',
-              'Search Result',
-              {
-                htmlText: '<style>'
-                  + '#find-winning-mod-result { display: flex !important; align-items: center; }'
-                  + '#find-winning-mod-result .modal-dialog { margin: auto !important; height: auto !important; }'
-                  + '#find-winning-mod-result .dialog-container { min-height: 0 !important; }'
-                  + '#find-winning-mod-result .dialog-content-html { flex: auto !important; font-size: 14px !important; line-height: 1.4em !important; }'
-                  + '</style>',
-                text: resultText,
-              },
-              [{ label: 'Close' }],
-              'find-winning-mod-result',
-            );
-          })
-          .catch((err) => {
-            api.showErrorNotification('Failed to read deployment manifest', err);
-          });
-      });
-    };
-  */
-
   function showFindWinningModDialog() {
     log('info', 'Start Find Mod Dialog')
     api.showDialog(
@@ -2293,61 +2204,6 @@ if ($def_events) {'Defender Events Found'} else {''}
 
 
   //=========================== Render the page  ==========================================================
-
-  /* return React.createElement(MainPage, null,
-       React.createElement(MainPage.Header, null,
-         // Left button group
-         React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-           React.createElement('button', {
-             className: 'btn btn-default',
-             onClick: () => util.opn(skyrimLogsPath).catch(() => undefined)
-           }, 'Skyrim Logs'),
-           React.createElement('button', {
-             className: 'btn btn-default',
-             onClick: () => util.opn(vortexLogsPath).catch(() => undefined)
-           }, 'Vortex Logs'),
-           React.createElement('button', {
-             className: 'btn btn-default',
-             onClick: () => util.opn(gamePath).catch(() => undefined)
-           }, 'Game Folder'),
-         ),
-         // spacer — pushes everything after it to the right  
-         React.createElement('div', { className: 'flex-fill' }),
-   
-         //Right button group
-         React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-           React.createElement('button', {
-             onClick: openScreenshotTool,
-             className: 'btn btn-default btn-s',
-             title: '⊞Win + Shift + S',
-           }, 'Take Screenshot'),
-           React.createElement('button', {
-             className: 'btn btn-default',
-             style: { display: 'flex', alignItems: 'center' },
-             onClick: () => util.opn('https://discord.gg/immersive-collections').catch(() => undefined)
-           },
-             React.createElement('svg', {
-               viewBox: '0 0 24 24',
-               width: '16',
-               height: '16',
-               style: { marginRight: '4px', fill: 'currentColor', flexShrink: 0 }
-             },
-               React.createElement('path', { d: discordIconPath })
-             ),
-             'Immersive Discord'
-           ),
-           React.createElement('button', {
-             className: 'btn btn-default',
-             onClick: showWelcomeDialog
-           }, 'Tips'),
-           React.createElement('div', { style: { marginBottom: '-6px' } },
-             React.createElement('span', { title: 'Make Immersive Support the default tab' },
-               React.createElement(Toggle, { checked: enabled, onToggle }, 'Automatically open')
-             ),
-           ),
-         ),
-   
-       ), */
 
   return React.createElement(MainPage, null,
     React.createElement(MainPage.Body, { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
