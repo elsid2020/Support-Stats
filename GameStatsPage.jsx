@@ -13,6 +13,7 @@ const { json } = require('stream/consumers');
 const semver = require('semver');
 const IniParser = require('vortex-parse-ini').default;
 const { WinapiFormat } = require('vortex-parse-ini');
+const eslGames = ['skyrimse', 'skyrimvr', 'fallout4', 'fallout4vr', 'starfield'];
 
 const iniFileMap = {
   skyrim: ['Skyrim/Skyrim.ini', 'Skyrim/SkyrimPrefs.ini'],
@@ -27,6 +28,10 @@ const iniFileMap = {
   enderal: ['Enderal/Enderal.ini', 'Enderal/EnderalPrefs.ini'],
   enderalspecialedition: ['Enderal Special Edition/Enderal.ini', 'Enderal Special Edition/EnderalPrefs.ini'],
 };
+const xseToolIdMap = {
+    skyrim: 'skse', skyrimse: 'skse64', skyrimvr: 'sksevr',
+    fallout4: 'f4se', fallout4vr: 'F4SEVR', falloutnv: 'nvse',
+  };
 // const displayPath = fullPath.replace(/\\/g, '/').replace(/(\/Users\/)([^/]+)/i, '$1<USER>');
 const skyrimLogsPath = path.join(util.getVortexPath('documents'), 'My Games', 'Skyrim Special Edition', 'SKSE');
 const vortexLogsPath = path.join(process.env.APPDATA, 'Vortex');
@@ -91,6 +96,15 @@ const supportedRevisions = {
 };
 
 
+ const knownLabels = {
+    'test-master-missing': 'Missing masters',
+    'test-rules-unfulfilled': 'Plugin dependencies not fulfilled',
+    'test-global-files': 'INI files missing',
+    'test-oblivion-fonts': 'Missing Oblivion fonts',
+    'test-skyrim-fonts': 'Missing Skyrim fonts',
+    'game-stats-welcome': 'Welcome dialog',
+
+  };
 
 
 
@@ -964,6 +978,8 @@ function GameStatsPage({ api }) {
     return modsActivity.includes('deployment') || modsActivity.includes('purging');
   });
 
+  
+
   const fnisAutoRunCheck = useSelector((state) => util.getSafe(state, ['settings', 'fnis', 'autoRun'], false));
 
   const nativeCount = Object.values(pluginList).filter(p => p.isNative).length;
@@ -1608,10 +1624,7 @@ const activeNotificationDetails = React.useMemo(() => {
 
   // SKSE64 as primary tool  
   // Tool IDs from script-extender-installer gameSupport.ts  
-  const xseToolIdMap = {
-    skyrim: 'skse', skyrimse: 'skse64', skyrimvr: 'sksevr',
-    fallout4: 'f4se', fallout4vr: 'F4SEVR', falloutnv: 'nvse',
-  };
+  
   const expectedXseId = xseToolIdMap[activeGameId];
   const isXsePrimary = expectedXseId
     ? primaryToolId === expectedXseId
@@ -1791,16 +1804,7 @@ const activeNotificationDetails = React.useMemo(() => {
   const suppressedCount = suppressedIds.length;
 
 
-  const knownLabels = {
-    'test-master-missing': 'Missing masters',
-    'test-rules-unfulfilled': 'Plugin dependencies not fulfilled',
-    'test-global-files': 'INI files missing',
-    'test-oblivion-fonts': 'Missing Oblivion fonts',
-    'test-skyrim-fonts': 'Missing Skyrim fonts',
-    'game-stats-welcome': 'Welcome dialog',
-
-  };
-
+ 
   // Cross-reference with active notifications for severity (best-effort — dismissed ones show 'unknown')  
   const suppressedWithType = React.useMemo(() => suppressedIds.map(id => {
     const [message, type] = (activeNotificationDetails[id] || '').split('\u0000');
@@ -1884,7 +1888,6 @@ const activeNotificationDetails = React.useMemo(() => {
 
   //Get plugin details for the current game
 
-  const eslGames = ['skyrimse', 'skyrimvr', 'fallout4', 'fallout4vr', 'starfield'];
   const eslGame = eslGames.includes(activeGameId);
 
   const isActive = (id) =>
@@ -1908,6 +1911,11 @@ const activeNotificationDetails = React.useMemo(() => {
     if (filePath.toLowerCase().endsWith('.esl')) return true;
     return pluginHeaders[id] === true;
   };
+
+  const deployedPluginIds = React.useMemo(  
+    () => Object.keys(pluginList).filter(isValid).sort().join('|'),  
+    [pluginList]  
+  );
 
   useEffect(() => {
     log('info', 'Start reading plugin headers for isLight flag')
@@ -1937,7 +1945,7 @@ const activeNotificationDetails = React.useMemo(() => {
         elapsedMs: Math.round(performance.now() - headerStarted),
       });
     });
-  }, [gamePath, activeGameId, pluginList, refreshKey, isDeployActive]);
+  }, [gamePath, activeGameId, deployedPluginIds, refreshKey, isDeployActive]);
 
 
   const activePlugins = React.useMemo(() => Object.keys(pluginList).filter(isValid), [pluginList, loadOrder]);
@@ -1969,16 +1977,15 @@ const activeNotificationDetails = React.useMemo(() => {
   }, shallowEqual);
 
   // Get enabled mod count for each profile  
-  const profileModCounts = useSelector((state) => {
-    const counts = {};
-    gameProfiles.forEach((profile) => {
-      const mods = state.persistent.mods[profile.gameId] || {};
-      counts[profile.id] = Object.keys(profile.modState || {})
-        .filter(id => profile.modState[id]?.enabled && mods[id]?.state === 'installed')
-        .length;
-    });
-    return counts;
-  }, shallowEqual);
+  const profileModCounts = React.useMemo(() => {  
+    const counts = {};  
+    gameProfiles.forEach((p) => {  
+      counts[p.id] = Object.keys(p.modState || {})  
+        .filter(id => p.modState[id]?.enabled && mods[id]?.state === 'installed')  
+        .length;  
+    });  
+    return counts;  
+  }, [gameProfiles, mods]);
 
   const gameProfileCount = gameProfiles.length;
 
@@ -2198,7 +2205,9 @@ if ($def_events) {'Defender Events Found'} else {''}
         setHealthAsync((p) => ({ ...p, securityEvents: "error" }));
       }
     };
-    getSkyrimSecurityEvents();
+    if (process.platform === 'win32') {  
+      getSkyrimSecurityEvents();  
+    }
     log('info', 'Finished searching logs for security events')
   }, [activeGameId, refreshKey]);
 
