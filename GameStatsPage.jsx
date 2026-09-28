@@ -1476,7 +1476,7 @@ const activeNotificationDetails = React.useMemo(() => {
       [{ label: 'Got it' }],
       'game-stats-welcome'
     ).then((result) => {
-      if (result.input['dont_show_again']) {
+      if (result?.input?.['dont_show_again']) {
         const dismissWelcome = () => dispatch({ type: 'SET_WELCOME_SEEN', payload: true });
 
       }
@@ -1828,7 +1828,7 @@ const activeNotificationDetails = React.useMemo(() => {
           if (!map[refId]) map[refId] = [];
           map[refId].push(entry);
         } else {
-          const installed = util.findModByRef(rule.reference, mods);
+          const installed = rule.reference ? util.findModByRef(rule.reference, mods) : undefined;
           if (installed !== undefined) {
             if (!map[installed.id]) map[installed.id] = [];
             map[installed.id].push(entry);
@@ -1962,7 +1962,7 @@ const activeNotificationDetails = React.useMemo(() => {
   // Get profiles for the current game  
   const gameProfiles = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
-    const allProfiles = state.persistent.profiles || {};
+    const allProfiles = state.persistent.profiles[gameId] || {};
     return Object.keys(allProfiles)
       .filter((id) => allProfiles[id].gameId === gameId)
       .map((id) => allProfiles[id]);
