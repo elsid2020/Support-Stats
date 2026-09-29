@@ -57,13 +57,15 @@ const expectedPluginCountMap = {
     100: [440, 92],
     101: [439, 92],
     102: [439, 92],
+    103: [438, 92],
 
   },
   'Immersive & Pure': {
     11: [396, 91],
-    12: [392, 93],
-    13: [392, 93],
-    14: [392, 93],
+    12: [392, 92],
+    13: [392, 92],
+    14: [392, 92],
+    15: [391, 92],
 
   },
   'Immersive & Epic': {
@@ -77,12 +79,14 @@ const expectedModCountMap = {
     100: [555, 13],
     101: [554, 13],
     102: [554, 13],
+    103: [553, 13],
   },
   'Immersive & Pure': {
     11: [477, 12],
     12: [483, 13],
     13: [483, 13],
-    14: [483, 13]
+    14: [483, 13],
+    15: [482, 13],
   },
   'Immersive & Epic': {
     0: [0, 0]
@@ -90,8 +94,8 @@ const expectedModCountMap = {
 };
 
 const supportedRevisions = {
-  'Immersive & Adult': ['99', '100', '101'],
-  'Immersive & Pure': ['11', '12', '13'],
+  'Immersive & Adult': ['99', '100', '101', '102', '103'],
+  'Immersive & Pure': ['11', '12', '13', '14', '15'],
   'Immersive & Epic': ['20'],
 };
 
@@ -419,14 +423,18 @@ function healthRow(label, isGood, detail, onClick, tooltip) {
 
 
 
-function copyButton(text, tooltip) {
+function copyButton(text, tooltip, api) {
   return React.createElement('span', { title: tooltip || 'Copy to clipboard', style: { color: 'var(--link-color)', cursor: 'pointer', marginLeft: '6px' } },
     React.createElement('button', {
       className: 'btn-embed',
       style: { background: 'none', border: 'none', padding: 0 },
-      onClick: () => require('electron').clipboard.writeText(text),
+      onClick: () => {
+        window.api.clipboard.writeText(text)
+        .catch(err => log('warn','clipboard write failed', err));
+        api.sendNotification({ type: 'success', message: tooltip, displayMS: 2000 })
+      }
     },
-      React.createElement(Icon, { name: 'clipboard-copy' })
+    React.createElement(Icon, { name: 'clipboard-copy' })
     )
   );
 }
@@ -703,12 +711,12 @@ function buildFaqItems(api, gamePath, gameId, baseCollectionAttributes) {
             'If you need to roll-back your SSE Version, Press ⊞Win + R (or go to Start > Run) and enter <code>steam://nav/console</code>',
             '<br>',
             'These will download the <b>SSE 1.6.1170</b> files:'),
-          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489831 8442952117333549665', copyButton('download_depot 489830 489831 8442952117333549665')),
-          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489832 8042843504692938467', copyButton('download_depot 489830 489832 8042843504692938467')),
-          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489833 1914580699073641964', copyButton('download_depot 489830 489833 1914580699073641964')),
+          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489831 8442952117333549665', copyButton('download_depot 489830 489831 8442952117333549665','Copied!', api)),
+          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489832 8042843504692938467', copyButton('download_depot 489830 489832 8042843504692938467','Copied!', api)),
+          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 489830 489833 1914580699073641964', copyButton('download_depot 489830 489833 1914580699073641964','Copied!', api)),
           ul('for Creation Kit:',),
-          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 1946180 1946182 7716046898922594451', copyButton('download_depot 1946180 1946182 7716046898922594451')),
-          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 1946180 1946183 9161772268289920525', copyButton('download_depot 1946180 1946183 9161772268289920525')),
+          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 1946180 1946182 7716046898922594451', copyButton('download_depot 1946180 1946182 7716046898922594451','Copied!', api)),
+          React.createElement('div', { style: { marginLeft: '20px', fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace' } }, 'download_depot 1946180 1946183 9161772268289920525', copyButton('download_depot 1946180 1946183 9161772268289920525','Copied!', api)),
           ul('<br>',
             'After download the files can be found in SSE Steam path under \\steam\\steamapps\\content\\app_489830',
             `Simply copy/move the files to your SSE folder`
@@ -2012,14 +2020,14 @@ const activeNotificationDetails = React.useMemo(() => {
     return modName === 'Immersive & Adult' || modName === 'Immersive & Pure' || modName === 'Immersive & Epic';
   }), [installedCollections]);
   const baseRevisionNumber = baseCollectionAttributes?.attributes?.revisionNumber;
- // const baseRevisionNumber = 102;
+  // const baseRevisionNumber = 99;
 
   const baseCollectionName = baseCollectionAttributes
     ? (util.renderModName(baseCollectionAttributes) || baseCollectionAttributes.id)
     : undefined;
 
   const engineInjectorsGood = (
-    baseRevisionNumber >= Number('100') || (baseRevisionNumber >= Number('12') && baseRevisionNumber <= Number('100'))
+    baseRevisionNumber >= 100 || (baseRevisionNumber >= 12 && baseRevisionNumber !== 99)
       ? hasPreloader && hasSwapper
       : hasPreloader
 
@@ -2491,7 +2499,7 @@ if ($def_events) {'Defender Events Found'} else {''}
                     ? React.createElement('div', { style: { marginBottom: '4px' } },
                       React.createElement('strong', null, `SKSE(v${skseVersion}): `),
                       xseExistsAtExpected
-                        ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(expectedXsePath))
+                        ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(expectedXsePath, 'Copied!', api))
 
                         /* ? React.createElement('span', {
                            style: { cursor: 'pointer', opacity: 0.8 },
@@ -2502,7 +2510,7 @@ if ($def_events) {'Defender Events Found'} else {''}
                            }
                          }, expectedXsePath) */
                         : xseExistsAtStored
-                          ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(xseTool.path))
+                          ? React.createElement('span', { style: { marginLeft: '4px' } }, expectedXsePath, copyButton(xseTool.path,'Copied!', api))
                           : React.createElement('span', { style: { opacity: 0.6 } }, 'Not found'),
                       xseStatus === 'hidden'
                         ? React.createElement('span', {
