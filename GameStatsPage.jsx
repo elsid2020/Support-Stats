@@ -107,6 +107,7 @@ const supportedRevisions = {
     'test-oblivion-fonts': 'Missing Oblivion fonts',
     'test-skyrim-fonts': 'Missing Skyrim fonts',
     'game-stats-welcome': 'Welcome dialog',
+    'test-game-version': ''
 
   };
 
@@ -908,7 +909,7 @@ function GameStatsPage({ api }) {
   });
   const exeVersion = require('exe-version');
   const gamePath = gameDiscovery?.path || 'Not discovered';
-  // const gameVersion = exeVersion.getProductVersionLocalized(path.join(gamePath, 'SkyrimSE.exe'));
+  // const gameVersion = '1.7.104'
   const gameVersion = React.useMemo(() => {  
     if (gamePath === 'Not discovered') return 'Unknown';  
     try {  
@@ -1153,11 +1154,9 @@ function GameStatsPage({ api }) {
       m => m.type !== 'collection' && m.state === 'installed'
     ).length;
   */
-  const srsInstalled = React.useMemo(() => {
-    Object.values(mods).find(
-    m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper'))
-    console.log('=====Runs every')
-}, [mods]);
+  const srsInstalled = React.useMemo(() => Object.values(mods).find(  
+  m => (util.renderModName(m) || m.id).toLowerCase().includes('skyrim runtime swapper')  
+), [mods]);
 
   const [hardwareInfo, setHardwareInfo] = React.useState({
     cpu: 'Loading...',
@@ -1978,7 +1977,7 @@ const activeNotificationDetails = React.useMemo(() => {
   // Get profiles for the current game  
   const gameProfiles = useSelector((state) => {
     const gameId = selectors.activeGameId(state);
-    const allProfiles = state.persistent.profiles[gameId] || {};
+    const allProfiles = state.persistent.profiles || {};
     return Object.keys(allProfiles)
       .filter((id) => allProfiles[id].gameId === gameId)
       .map((id) => allProfiles[id]);
@@ -2026,10 +2025,10 @@ const activeNotificationDetails = React.useMemo(() => {
     ? (util.renderModName(baseCollectionAttributes) || baseCollectionAttributes.id)
     : undefined;
 
-  const engineInjectorsGood = (
-    baseRevisionNumber >= 100 || (baseRevisionNumber >= 12 && baseRevisionNumber !== 99)
-      ? hasPreloader && hasSwapper
-      : hasPreloader
+  const engineInjectorsGood = (  
+  /^1\.7\.\d+/.test(gameVersion)  
+    ? hasPreloader && hasSwapper  
+    : hasPreloader  
 
   );
   const baseInstalledCollection = baseCollectionName + ' ' + baseRevisionNumber;
