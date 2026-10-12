@@ -58,6 +58,7 @@ const expectedPluginCountMap = {
     101: [439, 92],
     102: [439, 92],
     103: [438, 92],
+    104: [438, 92],
 
   },
   'Immersive & Pure': {
@@ -66,6 +67,7 @@ const expectedPluginCountMap = {
     13: [392, 92],
     14: [392, 92],
     15: [391, 92],
+    16: [391, 92],
 
   },
   'Immersive & Epic': {
@@ -79,7 +81,8 @@ const expectedModCountMap = {
     100: [555, 13],
     101: [554, 13],
     102: [554, 13],
-    103: [553, 13],
+    103: [554, 13],
+    104: [554, 13],
   },
   'Immersive & Pure': {
     11: [477, 12],
@@ -87,6 +90,7 @@ const expectedModCountMap = {
     13: [483, 13],
     14: [483, 13],
     15: [482, 13],
+    16: [482, 13],
   },
   'Immersive & Epic': {
     0: [0, 0]
@@ -94,8 +98,8 @@ const expectedModCountMap = {
 };
 
 const supportedRevisions = {
-  'Immersive & Adult': ['99', '100', '101', '102', '103'],
-  'Immersive & Pure': ['11', '12', '13', '14', '15'],
+  'Immersive & Adult': ['99', '100', '101', '102', '103', '104'],
+  'Immersive & Pure': ['11', '12', '13', '14', '15', '16'],
   'Immersive & Epic': ['20'],
 };
 
