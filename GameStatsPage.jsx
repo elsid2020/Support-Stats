@@ -58,7 +58,7 @@ const expectedPluginCountMap = {
     101: [439, 92],
     102: [439, 92],
     103: [438, 92],
-    104: [438, 92],
+    104: [437, 93],
 
   },
   'Immersive & Pure': {
@@ -67,7 +67,7 @@ const expectedPluginCountMap = {
     13: [392, 92],
     14: [392, 92],
     15: [391, 92],
-    16: [391, 92],
+    16: [390, 93],
 
   },
   'Immersive & Epic': {
@@ -873,6 +873,76 @@ function openScreenshotTool() {
     exec('screencapture -i -c'); // interactive, copies to clipboard  
   }
 }
+
+async function getBaseCollectionPlugins(api, baseCollectionAttributes, gameId) {  
+  const state = api.store.getState();  
+  const mods = state.persistent.mods[gameId] || {};  
+  const stagingPath = selectors.installPathForGame(state, gameId);  
+  
+  // match by mod id, not name+revision string (name match is fragile)  
+  const baseColl = Object.values(mods).find(  
+    (m) => m.type === 'collection' && m.id === baseCollectionAttributes.id  
+  );  
+  
+  if (baseColl === undefined) {  
+    log('warn', 'base collection not found', { baseInstalledCollection });  
+    return { required: [], optional: [] };  
+  }  
+  
+  const requiredModIds = new Set();  
+const optionalModIds = new Set();
+  const unresolvedRefs = [];  
+  
+(baseColl.rules || []).forEach((rule) => {  
+  const mod = util.findModByRef(rule.reference, mods);  
+  if (mod === undefined) {  
+    const ref = rule.reference || {};  
+    unresolvedRefs.push(ref.logicalFileName || ref.description || ref.fileExpression || ref.id || '<unknown>');  
+    return;  
+  }  
+   if (rule.type === 'requires') {  
+      requiredModIds.add(mod.id);  
+      optionalModIds.delete(mod.id);   // required wins if seen both ways  
+    } else if (rule.type === 'recommends' && !requiredModIds.has(mod.id)) {  
+      optionalModIds.add(mod.id);  
+    }
+  });
+  
+log('info', 'unresolved collection refs', {  
+  unresolved: unresolvedRefs.length,  
+  refs: unresolvedRefs,  
+});
+  
+  const scanMods = async (modIds) => {  
+    const results = await Promise.all(  
+      modIds.map(async (modId) => {  
+        try {  
+          const files = await fs.readdirAsync(  
+            path.join(stagingPath, mods[modId].installationPath)  
+          );  
+          return files.filter((f) =>  
+            ['.esp', '.esm', '.esl'].includes(path.extname(f).toLowerCase())  
+          );  
+        } catch (err) {  
+          log('warn', 'failed to read mod staging folder', {  
+            modId, error: err.message,  
+          });  
+          return [];  
+        }  
+      })  
+    );  
+    return [...new Set(results.flat())];  
+  };  
+  
+  const [required, optional] = await Promise.all([  
+  scanMods([...requiredModIds]),  
+  scanMods([...optionalModIds]),  
+]);  
+  
+  return { required, optional };  
+}
+
+
 
 /*==================Main Function================================================================================= 
 *
@@ -2222,6 +2292,18 @@ if ($def_events) {'Defender Events Found'} else {''}
     log('info', 'Finished searching logs for security events')
   }, [activeGameId, refreshKey]);
 
+
+   getBaseCollectionPlugins(api, baseCollectionAttributes, activeGameId)  
+  .then(({ required, optional }) => {  
+    console.log('base collection plugins', {  
+      requiredCount: required.length,  
+      optionalCount: optional.length,  
+      required,  
+      optional,  
+    });  
+  })  
+  .catch(err => log('warn', 'getBaseCollectionPlugins failed', { error: err.message }));
+  
 
   //=========================== Render the page  ==========================================================
 
