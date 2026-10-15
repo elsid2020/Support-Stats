@@ -2531,6 +2531,14 @@ if ($def_events) {'Defender Events Found'} else {''}
                 },
                   React.createElement('input', {
                     type: 'checkbox',
+                    style: {
+                      position: 'absolute',
+                      opacity: 0,
+                      width: 0,
+                      height: 0,
+                      margin: 0,
+                      pointerEvents: 'none',
+                    },
                     className: 'nxm-checkbox-input',
                     checked: healthAsync.aeDLCOwned === true,
                     onChange: (e) => {
@@ -2817,13 +2825,21 @@ if ($def_events) {'Defender Events Found'} else {''}
         },
           React.createElement('input', {
             type: 'checkbox',
+            style: {
+              position: 'absolute',
+              opacity: 0,
+              width: 0,
+              height: 0,
+              margin: 0,
+              pointerEvents: 'none',
+            },
             className: 'nxm-checkbox-input',
             checked: healthAsync.statsEnabled === true,
             onChange: (e) => {
               const checked = e.target.checked;
               setHealthAsync(p => ({ ...p, statsEnabled: checked ? true : false }));
             },
-            style: { marginRight: '6px', verticalAlign: 'middle' },
+            // style: { marginRight: '6px', verticalAlign: 'middle' },
           }),
           React.createElement('span', {
             className: 'nxm-checkbox',
